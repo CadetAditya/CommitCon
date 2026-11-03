@@ -53,6 +53,31 @@ An end-to-end Machine Learning and FastAPI recommendation engine with a complete
   - **Demand surge** and **driver shortage gap**.
 - One-click **"Accept Reposition & Navigate"** activating live in-app navigation simulation.
 
+### 4. Sherpa AI Copilot (GPU Driver Chatbot)
+- Fine-tuned inference assistant powered by `project-driver:latest`.
+- Provides contextual reasoning on demand forecasts, traffic bottlenecks, and earnings opportunities.
+- Accessible via the **🧭 Sherpa** tab and top header pill.
+
+---
+
+## Deployment (Render.com)
+
+This repository includes a production-ready `render.yaml` Blueprint and `Dockerfile`.
+
+### 1-Click Deployment via Render:
+1. Log in to [Render Dashboard](https://dashboard.render.com).
+2. Click **New +** > **Blueprint**.
+3. Connect your GitHub account and select repository: `https://github.com/CadetAditya/CommitCon.git`.
+4. Render automatically reads `render.yaml`, configures Python 3.11, installs `requirements.txt`, sets environment variables, and launches the service.
+5. Your app will be live at `https://commitcon-driver-portal.onrender.com`!
+
+### Manual Web Service Configuration on Render:
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `uvicorn phase5_api:app --host 0.0.0.0 --port $PORT`
+- **Environment Variables**:
+  - `AI_INFERENCE_URL`: `https://win-s6b0cl04s86.tailf0b46c.ts.net/chat`
+  - `AI_INFERENCE_KEY`: `commitcon-secret-2026`
+
 ---
 
 ## How to Run
