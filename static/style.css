@@ -1263,6 +1263,22 @@ body.uber-theme {
 .legend-dot.green { background: var(--uber-green); }
 .legend-dot.car { font-size: 12px; }
 
+.legend-divider {
+  height: 1px;
+  background: var(--uber-gray-200);
+  margin: 4px 0;
+}
+
+.legend-line {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.legend-line.green { background: #10B981; }
+.legend-line.orange { background: #F59E0B; }
+.legend-line.red { background: #EF4444; }
+
 .legend-text {
   font-size: 11.5px;
   color: var(--uber-gray-800);

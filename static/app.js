@@ -16,8 +16,9 @@ const state = {
 
   // Map state
   map: null,
-  tileLayer: null,
-  isDarkMap: false,
+  osmLayer: null,
+  trafficOverlay: null,
+  isTrafficView: true,
   driverMarker: null,
   zoneMarkers: {},           // 'Z01': L.marker / L.circleMarker
   routePolyline: null,
@@ -564,6 +565,9 @@ function formatReason(code) {
 // ============================================================================
 // MAP VISUALIZATION (LEAFLET INTEGRATION)
 // ============================================================================
+// Map boundaries matching static traffic image (lat 12.83 to 13.23, lon 77.46 to 77.76)
+const TRAFFIC_BOUNDS = [[12.83, 77.46], [13.23, 77.76]];
+
 function initMap() {
   if (state.map) return; // already initialized
 
@@ -575,39 +579,56 @@ function initMap() {
   state.map = L.map('map', {
     center: [centerLat, centerLon],
     zoom: 12,
-    zoomControl: false, // will position custom zoom if needed
+    minZoom: 10,
+    maxZoom: 18,
+    zoomControl: false,
+    maxBounds: [[12.75, 77.35], [13.35, 77.88]],
   });
 
   // Custom Zoom Control on bottom-left
   L.control.zoom({ position: 'bottomleft' }).addTo(state.map);
 
-  // Default CartoDB Positron (Uber clean light style)
-  setMapTiles(false);
+  // 1. Base OpenStreetMap layer (free, open, no API key required)
+  state.osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(state.map);
+
+  // 2. Custom Pane for Traffic Overlay (below vectors, markers & popups)
+  state.map.createPane('trafficPane');
+  state.map.getPane('trafficPane').style.zIndex = 250;
+
+  // 3. Static Traffic View Map Image (Photorealistic traffic conditions, no API key)
+  state.trafficOverlay = L.imageOverlay('/static/traffic_map.png', TRAFFIC_BOUNDS, {
+    opacity: 0.96,
+    interactive: false,
+    pane: 'trafficPane',
+  }).addTo(state.map);
+
+  state.isTrafficView = true;
 
   // Render initial driver marker
   updateDriverMarker();
 }
 
-function setMapTiles(dark = false) {
-  if (state.tileLayer) {
-    state.map.removeLayer(state.tileLayer);
-  }
-
-  state.isDarkMap = dark;
-  const tileUrl = dark
-    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-
-  state.tileLayer = L.tileLayer(tileUrl, {
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
-    maxZoom: 19,
-    subdomains: 'abcd',
-  }).addTo(state.map);
-}
-
 function toggleMapTheme() {
-  setMapTiles(!state.isDarkMap);
-  mapThemeBtn.querySelector('.ctrl-icon').textContent = state.isDarkMap ? '☀️' : '🌙';
+  if (state.isTrafficView) {
+    // Hide static traffic overlay -> Reveal pure OpenStreetMap
+    if (state.trafficOverlay && state.map.hasLayer(state.trafficOverlay)) {
+      state.map.removeLayer(state.trafficOverlay);
+    }
+    state.isTrafficView = false;
+    mapThemeBtn.querySelector('.ctrl-icon').textContent = '🚦';
+    mapThemeBtn.querySelector('.ctrl-tooltip').textContent = 'Traffic View';
+  } else {
+    // Show static traffic overlay
+    if (state.trafficOverlay && !state.map.hasLayer(state.trafficOverlay)) {
+      state.trafficOverlay.addTo(state.map);
+    }
+    state.isTrafficView = true;
+    mapThemeBtn.querySelector('.ctrl-icon').textContent = '🗺️';
+    mapThemeBtn.querySelector('.ctrl-tooltip').textContent = 'Street Map';
+  }
 }
 
 function getZoneLatLng(zoneId) {
@@ -682,7 +703,7 @@ function renderMapZoneMarkers(zones) {
       iconAnchor: [20, 12],
     });
 
-    const marker = L.marker(coords, { icon: icon }).addTo(state.map);
+    const marker = L.marker(coords, { icon: icon, zIndexOffset: 500 }).addTo(state.map);
 
     // Uber Popup
     const popupContent = `

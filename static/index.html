@@ -315,9 +315,9 @@
             <span class="ctrl-tooltip">My Location</span>
           </button>
 
-          <button id="map-theme-btn" class="map-ctrl-btn" title="Toggle Map Style (Light/Dark)">
-            <span class="ctrl-icon">🌙</span>
-            <span class="ctrl-tooltip">Toggle Style</span>
+          <button id="map-theme-btn" class="map-ctrl-btn" title="Toggle Traffic View / Street Map">
+            <span class="ctrl-icon">🗺️</span>
+            <span class="ctrl-tooltip">Street Map</span>
           </button>
 
           <button id="map-fit-bounds-btn" class="map-ctrl-btn" title="View Entire City">
@@ -329,7 +329,7 @@
         <!-- FLOATING MAP LEGEND -->
         <div class="map-floating-legend">
           <div class="legend-header">
-            <span class="legend-title">Demand Radar</span>
+            <span class="legend-title">Demand & Traffic Radar</span>
           </div>
           <div class="legend-row">
             <span class="legend-dot red"></span>
@@ -346,6 +346,19 @@
           <div class="legend-row">
             <span class="legend-dot car">🚗</span>
             <span class="legend-text">Your Vehicle</span>
+          </div>
+          <div class="legend-divider"></div>
+          <div class="legend-row">
+            <span class="legend-line green"></span>
+            <span class="legend-text">Fast Traffic (60-80 km/h)</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-line orange"></span>
+            <span class="legend-text">Moderate Delay</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-line red"></span>
+            <span class="legend-text">Heavy Congestion / Surge</span>
           </div>
         </div>
 
