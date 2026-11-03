@@ -1,0 +1,305 @@
+{
+  "run_id": "run_20261104_004506",
+  "generated_at": "2026-11-04T00:45:06.369347+05:30",
+  "model_version": "xgboost_v1",
+  "total_zones": 20,
+  "summary": {
+    "reposition_in": 5,
+    "reposition_out": 7,
+    "monitor": 8
+  },
+  "zones": [
+    {
+      "zone_id": "Z04",
+      "zone_name": "Tech Park South",
+      "predicted_requests": 8,
+      "required_drivers": 7,
+      "available_drivers": 1,
+      "supply_gap": 4,
+      "recommended_action": "REPOSITION_IN",
+      "reason_codes": [
+        "HIGH_FORECAST_DEMAND",
+        "DRIVER_SHORTAGE"
+      ],
+      "reposition_sources": [
+        "Z10",
+        "Z13",
+        "Z15",
+        "Z17",
+        "Z20"
+      ]
+    },
+    {
+      "zone_id": "Z03",
+      "zone_name": "Tech Park East",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 1,
+      "supply_gap": 4,
+      "recommended_action": "REPOSITION_IN",
+      "reason_codes": [
+        "DRIVER_SHORTAGE",
+        "EVENT_NEARBY"
+      ],
+      "reposition_sources": [
+        "Z05",
+        "Z13",
+        "Z15",
+        "Z17"
+      ]
+    },
+    {
+      "zone_id": "Z02",
+      "zone_name": "Airport",
+      "predicted_requests": 14,
+      "required_drivers": 12,
+      "available_drivers": 4,
+      "supply_gap": 3,
+      "recommended_action": "MONITOR",
+      "reason_codes": [
+        "HIGH_FORECAST_DEMAND",
+        "DRIVER_SHORTAGE",
+        "NO_NEARBY_SURPLUS"
+      ]
+    },
+    {
+      "zone_id": "Z11",
+      "zone_name": "Residential East",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 2,
+      "supply_gap": 3,
+      "recommended_action": "REPOSITION_IN",
+      "reason_codes": [
+        "DRIVER_SHORTAGE",
+        "EVENT_NEARBY"
+      ],
+      "reposition_sources": [
+        "Z05",
+        "Z06",
+        "Z13",
+        "Z17"
+      ]
+    },
+    {
+      "zone_id": "Z16",
+      "zone_name": "Lake Garden Area",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 3,
+      "supply_gap": 3,
+      "recommended_action": "REPOSITION_IN",
+      "reason_codes": [
+        "DRIVER_SHORTAGE",
+        "EVENT_NEARBY"
+      ],
+      "reposition_sources": [
+        "Z05",
+        "Z06",
+        "Z10",
+        "Z13",
+        "Z15",
+        "Z17"
+      ]
+    },
+    {
+      "zone_id": "Z07",
+      "zone_name": "Railway Station",
+      "predicted_requests": 14,
+      "required_drivers": 12,
+      "available_drivers": 5,
+      "supply_gap": 2,
+      "recommended_action": "REPOSITION_IN",
+      "reason_codes": [
+        "HIGH_FORECAST_DEMAND",
+        "DRIVER_SHORTAGE",
+        "EVENT_NEARBY"
+      ],
+      "reposition_sources": [
+        "Z06",
+        "Z13",
+        "Z15"
+      ]
+    },
+    {
+      "zone_id": "Z14",
+      "zone_name": "Government Quarter",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 2,
+      "supply_gap": 1,
+      "recommended_action": "MONITOR",
+      "reason_codes": [
+        "DRIVER_SHORTAGE",
+        "EVENT_NEARBY"
+      ]
+    },
+    {
+      "zone_id": "Z12",
+      "zone_name": "Industrial Zone",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 2,
+      "supply_gap": 1,
+      "recommended_action": "MONITOR",
+      "reason_codes": [
+        "DRIVER_SHORTAGE"
+      ]
+    },
+    {
+      "zone_id": "Z18",
+      "zone_name": "Highway Corridor",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 2,
+      "supply_gap": 1,
+      "recommended_action": "MONITOR",
+      "reason_codes": [
+        "DRIVER_SHORTAGE"
+      ]
+    },
+    {
+      "zone_id": "Z19",
+      "zone_name": "Suburban West",
+      "predicted_requests": 6,
+      "required_drivers": 5,
+      "available_drivers": 1,
+      "supply_gap": 0,
+      "recommended_action": "MONITOR",
+      "reason_codes": [
+        "HIGH_FORECAST_DEMAND"
+      ]
+    },
+    {
+      "zone_id": "Z09",
+      "zone_name": "Residential North",
+      "predicted_requests": 6,
+      "required_drivers": 5,
+      "available_drivers": 2,
+      "supply_gap": 0,
+      "recommended_action": "MONITOR",
+      "reason_codes": [
+        "HIGH_FORECAST_DEMAND"
+      ]
+    },
+    {
+      "zone_id": "Z01",
+      "zone_name": "Downtown",
+      "predicted_requests": 6,
+      "required_drivers": 5,
+      "available_drivers": 3,
+      "supply_gap": -1,
+      "recommended_action": "MONITOR",
+      "reason_codes": [
+        "HIGH_FORECAST_DEMAND",
+        "DRIVER_SURPLUS",
+        "EVENT_NEARBY"
+      ]
+    },
+    {
+      "zone_id": "Z08",
+      "zone_name": "Hospital District",
+      "predicted_requests": 6,
+      "required_drivers": 5,
+      "available_drivers": 1,
+      "supply_gap": -1,
+      "recommended_action": "MONITOR",
+      "reason_codes": [
+        "HIGH_FORECAST_DEMAND",
+        "DRIVER_SURPLUS",
+        "EVENT_NEARBY"
+      ]
+    },
+    {
+      "zone_id": "Z20",
+      "zone_name": "IT Corridor South",
+      "predicted_requests": 6,
+      "required_drivers": 5,
+      "available_drivers": 1,
+      "supply_gap": -2,
+      "recommended_action": "REPOSITION_OUT",
+      "reason_codes": [
+        "HIGH_FORECAST_DEMAND",
+        "DRIVER_SURPLUS"
+      ]
+    },
+    {
+      "zone_id": "Z06",
+      "zone_name": "Shopping Mall Area",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 1,
+      "supply_gap": -2,
+      "recommended_action": "REPOSITION_OUT",
+      "reason_codes": [
+        "DRIVER_SURPLUS",
+        "EVENT_NEARBY"
+      ]
+    },
+    {
+      "zone_id": "Z15",
+      "zone_name": "Old City Market",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 1,
+      "supply_gap": -2,
+      "recommended_action": "REPOSITION_OUT",
+      "reason_codes": [
+        "DRIVER_SURPLUS",
+        "EVENT_NEARBY"
+      ]
+    },
+    {
+      "zone_id": "Z05",
+      "zone_name": "University District",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 1,
+      "supply_gap": -3,
+      "recommended_action": "REPOSITION_OUT",
+      "reason_codes": [
+        "DRIVER_SURPLUS",
+        "EVENT_NEARBY"
+      ]
+    },
+    {
+      "zone_id": "Z10",
+      "zone_name": "Residential South",
+      "predicted_requests": 6,
+      "required_drivers": 5,
+      "available_drivers": 2,
+      "supply_gap": -5,
+      "recommended_action": "REPOSITION_OUT",
+      "reason_codes": [
+        "HIGH_FORECAST_DEMAND",
+        "DRIVER_SURPLUS"
+      ]
+    },
+    {
+      "zone_id": "Z17",
+      "zone_name": "Convention Center",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 1,
+      "supply_gap": -5,
+      "recommended_action": "REPOSITION_OUT",
+      "reason_codes": [
+        "DRIVER_SURPLUS",
+        "EVENT_NEARBY"
+      ]
+    },
+    {
+      "zone_id": "Z13",
+      "zone_name": "Entertainment District",
+      "predicted_requests": 5,
+      "required_drivers": 4,
+      "available_drivers": 2,
+      "supply_gap": -6,
+      "recommended_action": "REPOSITION_OUT",
+      "reason_codes": [
+        "DRIVER_SURPLUS",
+        "EVENT_NEARBY"
+      ]
+    }
+  ]
+}
