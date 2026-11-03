@@ -21,7 +21,9 @@ import threading
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import List, Optional
+import os
+from typing import List, Optional, Literal, Any
+import httpx
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,6 +49,10 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
+
+# AI Inference Service Configuration
+AI_INFERENCE_URL = os.getenv("AI_INFERENCE_URL", "https://win-s6b0cl04s86.tailf0b46c.ts.net/chat")
+AI_INFERENCE_KEY = os.getenv("AI_INFERENCE_KEY", "commitcon-secret-2026")
 
 # ---------------------------------------------------------------------------
 # Scheduler (Native background scheduler with APScheduler fallback)
@@ -215,6 +221,25 @@ class HealthResponse(BaseModel):
 class AcceptRepositionRequest(BaseModel):
     driver_id: str
     destination_zone_id: str
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class DriverChatRequest(BaseModel):
+    driver_id: str
+    driver_prompt: str
+    current_zone_id: Optional[str] = "Z06"
+    history: Optional[List[ChatMessage]] = []
+
+
+class DriverChatResponse(BaseModel):
+    status: str
+    driver_id: str
+    answer: str
+    model: str
 
 
 # ---------------------------------------------------------------------------
@@ -418,6 +443,86 @@ def accept_reposition(req: AcceptRepositionRequest):
         "dispatch_timestamp": datetime.now(IST).isoformat(),
         "message": f"Navigation route dispatched to {req.destination_zone_id}.",
     }
+
+
+@app.post("/api/chat", response_model=DriverChatResponse)
+async def driver_copilot_chat(req: DriverChatRequest):
+    """Driver chatbot assistant: integrates real-time recommendation data
+    and forwards to the GPU-powered inference API.
+    """
+    logger.info("Driver %s asked copilot: %s", req.driver_id, req.driver_prompt[:80])
+
+    # 1. Fetch real-time recommendation data for driver's current zone
+    zone_id = req.current_zone_id or "Z06"
+    try:
+        recommendation_data = get_driver_personalized_recommendations(zone_id, max_results=6)
+    except Exception as e:
+        logger.warning("Could not get personalized recs for %s: %s", zone_id, e)
+        recommendation_data = {
+            "driver_current_zone": {"zone_id": zone_id, "zone_name": f"Zone {zone_id}"},
+            "recommendations": []
+        }
+
+    # Attach citywide summary if available
+    if latest_recommendation and "summary" in latest_recommendation:
+        recommendation_data["citywide_summary"] = latest_recommendation["summary"]
+
+    # 2. Prepare payload matching external ChatRequest schema
+    payload = {
+        "driver_id": req.driver_id,
+        "driver_prompt": req.driver_prompt,
+        "recommendation_data": recommendation_data,
+        "history": [{"role": m.role, "content": m.content} for m in (req.history or [])]
+    }
+
+    # 3. Call GPU inference API
+    headers = {
+        "Content-Type": "application/json",
+        "X-API-Key": AI_INFERENCE_KEY,
+        "User-Agent": "CommitCon-Backend"
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            resp = await client.post(AI_INFERENCE_URL, json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+            return DriverChatResponse(
+                status="success",
+                driver_id=req.driver_id,
+                answer=data.get("answer", "No answer received from model."),
+                model=data.get("model", "project-driver:latest")
+            )
+    except httpx.TimeoutException:
+        logger.error("AI inference service timed out for driver %s", req.driver_id)
+        top_rec = recommendation_data["recommendations"][0] if recommendation_data.get("recommendations") else None
+        fallback_msg = (
+            f"The AI model is taking longer than usual to respond. "
+            f"Based on live demand forecasts, your highest priority target is {top_rec['zone_id']} {top_rec['zone_name']} "
+            f"with a shortage of {top_rec['supply_gap']} drivers (ETA: {top_rec['travel_time_min']}m)."
+            if top_rec else "The AI inference service is busy. Please try again in a few moments."
+        )
+        return DriverChatResponse(
+            status="fallback",
+            driver_id=req.driver_id,
+            answer=fallback_msg,
+            model="local-rules-engine"
+        )
+    except Exception as exc:
+        logger.exception("AI inference error: %s", exc)
+        top_rec = recommendation_data["recommendations"][0] if recommendation_data.get("recommendations") else None
+        fallback_msg = (
+            f"Note: External GPU inference reached limit ({str(exc)[:60]}). "
+            f"Live recommendation: Reposition to {top_rec['zone_id']} {top_rec['zone_name']} "
+            f"(ETA: {top_rec['travel_time_min']} mins, +{top_rec['supply_gap']} drivers needed)."
+            if top_rec else f"AI service error: {exc}"
+        )
+        return DriverChatResponse(
+            status="fallback",
+            driver_id=req.driver_id,
+            answer=fallback_msg,
+            model="local-rules-engine"
+        )
 
 
 # ---------------------------------------------------------------------------

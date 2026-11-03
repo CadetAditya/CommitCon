@@ -134,6 +134,13 @@
           <span id="model-refresh-label">AI Model Live</span>
         </div>
 
+        <!-- Copilot Header Pill -->
+        <button id="header-copilot-btn" class="header-copilot-pill" title="Chat with AI Driver Copilot">
+          <span class="copilot-pill-icon">💬</span>
+          <span class="copilot-pill-text">AI Copilot</span>
+          <span class="copilot-status-dot"></span>
+        </button>
+
         <!-- Driver Profile Menu -->
         <div class="user-profile-menu">
           <span id="user-avatar" class="user-avatar">👨🏽‍💼</span>
@@ -164,13 +171,17 @@
         <div class="uber-segmented-control">
           <button id="tab-personal-btn" class="seg-btn active">
             <span class="seg-icon">🎯</span>
-            <span class="seg-text">Recommended for Me</span>
-            <span class="seg-badge" id="personal-badge-count">5</span>
+            <span class="seg-text">For Me</span>
+            <span class="seg-badge" id="personal-badge-count">6</span>
           </button>
           <button id="tab-overall-btn" class="seg-btn">
             <span class="seg-icon">🏙️</span>
-            <span class="seg-text">City Demand</span>
-            <span class="seg-badge" id="total-zones-badge">20</span>
+            <span class="seg-text">City (20)</span>
+          </button>
+          <button id="tab-copilot-btn" class="seg-btn highlight-copilot">
+            <span class="seg-icon">💬</span>
+            <span class="seg-text">AI Copilot</span>
+            <span class="seg-badge pulse-badge">AI</span>
           </button>
         </div>
 
@@ -298,6 +309,57 @@
               <span>Loading citywide model forecasts...</span>
             </div>
           </div>
+        </div>
+
+        <!-- ================= TAB 3: AI DRIVER COPILOT (CHATBOT) ================= -->
+        <div id="panel-copilot" class="sidebar-panel-content copilot-panel hidden">
+          <!-- COPILOT HEADER -->
+          <div class="copilot-banner">
+            <div class="copilot-banner-left">
+              <div class="copilot-avatar">🤖</div>
+              <div>
+                <div class="copilot-title">Uber Copilot AI</div>
+                <div class="copilot-status-line">
+                  <span class="copilot-live-dot"></span>
+                  <span class="copilot-model-name">GPU Active • project-driver:latest</span>
+                </div>
+              </div>
+            </div>
+            <button id="clear-chat-btn" class="copilot-clear-btn" title="Clear chat history">🗑️</button>
+          </div>
+
+          <!-- QUICK PROMPT CHIPS -->
+          <div class="copilot-quick-prompts">
+            <div class="quick-prompts-label">Suggested Questions:</div>
+            <div class="quick-chips-scroll">
+              <button class="copilot-chip" data-prompt="Where is the highest demand surge right now?">⚡ Highest Surge</button>
+              <button class="copilot-chip" data-prompt="Which zone gives me the quickest reposition under 15 mins?">🚀 Quickest ETA (&lt;15m)</button>
+              <button class="copilot-chip" data-prompt="Is it worth driving to Z02 Airport right now?">✈️ Airport Analysis</button>
+              <button class="copilot-chip" data-prompt="Why does my current zone have a driver shortage?">📍 Why my zone?</button>
+              <button class="copilot-chip" data-prompt="How can I maximize my earnings in the next 60 minutes?">💰 Maximize Earnings</button>
+            </div>
+          </div>
+
+          <!-- CHAT STREAM -->
+          <div id="copilot-messages" class="copilot-chat-stream">
+            <!-- Messages populated dynamically -->
+          </div>
+
+          <!-- CHAT INPUT BAR -->
+          <form id="copilot-form" class="copilot-input-area">
+            <div class="copilot-input-wrapper">
+              <input type="text" id="copilot-input" placeholder="Ask AI Copilot about demand or zones..." autocomplete="off" required>
+              <button type="submit" id="copilot-send-btn" class="copilot-send-btn" title="Send message">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
+            <div class="copilot-disclaimer">
+              Powered by real-time ML forecast data from your active zone.
+            </div>
+          </form>
         </div>
 
       </aside>

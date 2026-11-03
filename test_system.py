@@ -211,6 +211,18 @@ def run_all_tests():
     assert manual_data["total_zones"] == 20
     print("  POST /recommendations/refresh -> OK")
 
+    # Chatbot / Copilot integration
+    import asyncio
+    chat_req = phase5_api.DriverChatRequest(
+        driver_id="DRV_101",
+        driver_prompt="Where should I go to get more rides right now?",
+        current_zone_id="Z06"
+    )
+    chat_resp = asyncio.run(phase5_api.driver_copilot_chat(chat_req))
+    assert chat_resp.status in ("success", "fallback")
+    assert len(chat_resp.answer) > 10
+    print(f"  POST /api/chat -> OK (model={chat_resp.model}, status={chat_resp.status})")
+
     print("\n" + "=" * 70)
     print("ALL TESTS PASSED! BACKEND & FRONTEND READY FOR DRIVERS!")
     print("=" * 70)

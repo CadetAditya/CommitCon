@@ -23,6 +23,7 @@ const state = {
   zoneMarkers: {},           // 'Z01': L.marker / L.circleMarker
   routePolyline: null,
   routePulseMarker: null,
+  chatHistory: [],
 };
 
 // DOM Elements
@@ -48,11 +49,21 @@ const modelRefreshLabel = document.getElementById('model-refresh-label');
 // Tabs
 const tabPersonalBtn = document.getElementById('tab-personal-btn');
 const tabOverallBtn = document.getElementById('tab-overall-btn');
+const tabCopilotBtn = document.getElementById('tab-copilot-btn');
+const headerCopilotBtn = document.getElementById('header-copilot-btn');
 const panelPersonal = document.getElementById('panel-personal');
 const panelOverall = document.getElementById('panel-overall');
+const panelCopilot = document.getElementById('panel-copilot');
 const personalBadgeCount = document.getElementById('personal-badge-count');
 const personalCardsList = document.getElementById('personal-cards-list');
 const refreshPersonalBtn = document.getElementById('refresh-personal-btn');
+
+// Copilot Chat Elements
+const copilotMessages = document.getElementById('copilot-messages');
+const copilotForm = document.getElementById('copilot-form');
+const copilotInput = document.getElementById('copilot-input');
+const copilotSendBtn = document.getElementById('copilot-send-btn');
+const clearChatBtn = document.getElementById('clear-chat-btn');
 
 // City Demand
 const allZonesList = document.getElementById('all-zones-list');
@@ -114,6 +125,30 @@ function setupEventListeners() {
   // Tab switching
   tabPersonalBtn.addEventListener('click', () => switchTab('personal'));
   tabOverallBtn.addEventListener('click', () => switchTab('overall'));
+  tabCopilotBtn.addEventListener('click', () => switchTab('copilot'));
+  headerCopilotBtn.addEventListener('click', () => switchTab('copilot'));
+
+  // Copilot Chat listeners
+  copilotForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const prompt = copilotInput.value.trim();
+    if (prompt) {
+      sendCopilotMessage(prompt);
+      copilotInput.value = '';
+    }
+  });
+
+  clearChatBtn.addEventListener('click', clearCopilotChat);
+
+  document.querySelectorAll('.copilot-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const prompt = chip.getAttribute('data-prompt');
+      if (prompt) {
+        switchTab('copilot');
+        sendCopilotMessage(prompt);
+      }
+    });
+  });
 
   // Zone selector in header
   currentZoneSelect.addEventListener('change', async (e) => {
@@ -535,17 +570,148 @@ function filterCityZones() {
 }
 
 function switchTab(tab) {
-  if (tab === 'personal') {
-    tabPersonalBtn.classList.add('active');
-    tabOverallBtn.classList.remove('active');
-    panelPersonal.classList.remove('hidden');
-    panelOverall.classList.add('hidden');
-  } else {
-    tabPersonalBtn.classList.remove('active');
-    tabOverallBtn.classList.add('active');
-    panelPersonal.classList.add('hidden');
-    panelOverall.classList.remove('hidden');
+  tabPersonalBtn.classList.toggle('active', tab === 'personal');
+  tabOverallBtn.classList.toggle('active', tab === 'overall');
+  tabCopilotBtn.classList.toggle('active', tab === 'copilot');
+
+  panelPersonal.classList.toggle('hidden', tab !== 'personal');
+  panelOverall.classList.toggle('hidden', tab !== 'overall');
+  panelCopilot.classList.toggle('hidden', tab !== 'copilot');
+
+  if (tab === 'copilot') {
+    if (state.chatHistory.length === 0) {
+      initCopilotWelcome();
+    }
+    setTimeout(() => {
+      copilotInput.focus();
+      scrollChatToBottom();
+    }, 100);
   }
+}
+
+// ============================================================================
+// AI DRIVER COPILOT (CHATBOT)
+// ============================================================================
+function initCopilotWelcome() {
+  const driverName = state.driver ? state.driver.name.split(' ')[0] : 'Driver';
+  const welcomeText = `Hello ${driverName}! I'm your **Uber Copilot AI** connected to our GPU inference service (\`project-driver:latest\`).
+
+I have live context on your position in **${state.currentZone}** and real-time demand forecasts across all 20 city zones.
+
+Ask me anything, like:
+* **"Where should I reposition right now?"**
+* **"Why is Z02 Airport recommended?"**
+* **"Which zone has the fastest travel time under 15 minutes?"**`;
+
+  appendCopilotMessage('assistant', welcomeText, false);
+}
+
+function appendCopilotMessage(role, text, save = true) {
+  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (save) {
+    state.chatHistory.push({ role, content: text });
+    try {
+      const storageKey = 'copilot_history_' + (state.driver ? state.driver.id : 'demo');
+      localStorage.setItem(storageKey, JSON.stringify(state.chatHistory.slice(-12)));
+    } catch {}
+  }
+
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `chat-msg ${role === 'user' ? 'user' : 'bot'}`;
+
+  const avatar = role === 'user' ? (state.driver ? state.driver.avatar : '👨🏽‍💼') : '🤖';
+  const formattedHtml = formatMarkdown(text);
+
+  msgDiv.innerHTML = `
+    <div class="chat-msg-avatar">${avatar}</div>
+    <div class="chat-bubble">
+      ${formattedHtml}
+      <span class="chat-time">${timeStr}</span>
+    </div>
+  `;
+
+  copilotMessages.appendChild(msgDiv);
+  scrollChatToBottom();
+}
+
+function formatMarkdown(text) {
+  if (!text) return '';
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code style="background:#E2E8F0;padding:2px 4px;border-radius:4px;font-size:11px;">$1</code>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n\* /g, '<br>• ')
+    .replace(/\n/g, '<br>');
+
+  return `<p>${html}</p>`;
+}
+
+async function sendCopilotMessage(prompt) {
+  appendCopilotMessage('user', prompt, true);
+
+  // Show typing indicator
+  const typingDiv = document.createElement('div');
+  typingDiv.className = 'chat-msg bot copilot-typing-msg';
+  typingDiv.innerHTML = `
+    <div class="chat-msg-avatar">🤖</div>
+    <div class="copilot-typing">
+      <span>AI Copilot is analyzing fleet data</span>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    </div>
+  `;
+  copilotMessages.appendChild(typingDiv);
+  scrollChatToBottom();
+
+  copilotSendBtn.disabled = true;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        driver_id: state.driver ? state.driver.id : 'DRV_101',
+        driver_prompt: prompt,
+        current_zone_id: state.currentZone,
+        history: state.chatHistory.slice(-8),
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Inference returned HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    typingDiv.remove();
+    appendCopilotMessage('assistant', data.answer, true);
+  } catch (err) {
+    typingDiv.remove();
+    appendCopilotMessage(
+      'assistant',
+      `⚠️ Could not reach AI Copilot (${err.message}). Live model recommendation: check **Z02 Airport** or **Z07 Railway Station** for high demand.`,
+      false
+    );
+  } finally {
+    copilotSendBtn.disabled = false;
+  }
+}
+
+function clearCopilotChat() {
+  state.chatHistory = [];
+  try {
+    const storageKey = 'copilot_history_' + (state.driver ? state.driver.id : 'demo');
+    localStorage.removeItem(storageKey);
+  } catch {}
+  copilotMessages.innerHTML = '';
+  initCopilotWelcome();
+}
+
+function scrollChatToBottom() {
+  copilotMessages.scrollTop = copilotMessages.scrollHeight;
 }
 
 function formatReason(code) {
