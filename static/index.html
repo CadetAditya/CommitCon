@@ -2,256 +2,360 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CommitCon Driver Portal | AI Fleet Intelligence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Uber Driver | Fleet Repositioning & Demand Radar</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS for Uber Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="uber-theme">
 
-  <!-- ================= AUTH VIEW (LOGIN) ================= -->
-  <div id="auth-view" class="auth-wrapper">
-    <div class="auth-card">
-      <div class="brand-header">
-        <div class="brand-logo">🚗💨</div>
-        <h1>CommitCon Driver</h1>
-        <p class="brand-subtitle">AI-Powered Demand & Repositioning Portal</p>
-      </div>
+  <!-- ================= AUTH VIEW (UBER LOGIN) ================= -->
+  <div id="auth-view" class="uber-auth-container">
+    <div class="auth-top-nav">
+      <div class="uber-wordmark">Uber</div>
+      <div class="uber-badge-tag">Driver Partner</div>
+    </div>
 
-      <div id="login-error" class="alert-box error hidden"></div>
+    <div class="auth-center-box">
+      <div class="auth-card">
+        <h1 class="auth-title">Sign in to start driving</h1>
+        <p class="auth-subtitle">AI-powered demand forecast & repositioning radar</p>
 
-      <form id="login-form">
-        <div class="form-group">
-          <label for="username">Email or Phone Number</label>
-          <div class="input-container">
-            <span class="input-icon">📱</span>
-            <input type="text" id="username" placeholder="e.g. aditya@commitcon.com or 9876543210" required autocomplete="username">
+        <div id="login-error" class="alert-banner error hidden"></div>
+
+        <form id="login-form">
+          <div class="uber-field-group">
+            <label for="username">Phone number or email</label>
+            <div class="uber-input-wrap">
+              <span class="input-icon">📱</span>
+              <input type="text" id="username" placeholder="e.g. aditya@commitcon.com or 9876543210" required autocomplete="username">
+            </div>
+          </div>
+
+          <div class="uber-field-group">
+            <label for="password">Password</label>
+            <div class="uber-input-wrap">
+              <span class="input-icon">🔒</span>
+              <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+              <button type="button" id="toggle-password-btn" class="password-toggle">Show</button>
+            </div>
+          </div>
+
+          <button type="submit" id="login-submit-btn" class="uber-btn-primary full-width">Continue</button>
+        </form>
+
+        <div class="uber-divider">
+          <span>OR CHOOSE DEMO DRIVER</span>
+        </div>
+
+        <div class="demo-driver-grid">
+          <div class="demo-driver-card" data-user="aditya@commitcon.com" data-zone="Z06">
+            <div class="driver-avatar-circle">👨🏽‍💼</div>
+            <div class="driver-card-info">
+              <div class="driver-card-name">Aditya Singh <span class="rating">★ 4.92</span></div>
+              <div class="driver-card-meta">📍 Z06 Shopping Mall • Toyota Sedan</div>
+            </div>
+            <div class="demo-select-arrow">➔</div>
+          </div>
+
+          <div class="demo-driver-card" data-user="rajesh@commitcon.com" data-zone="Z13">
+            <div class="driver-avatar-circle">👨🏻‍✈️</div>
+            <div class="driver-card-info">
+              <div class="driver-card-name">Rajesh Kumar <span class="rating">★ 4.88</span></div>
+              <div class="driver-card-meta">📍 Z13 Entertainment • Hyundai Prime</div>
+            </div>
+            <div class="demo-select-arrow">➔</div>
+          </div>
+
+          <div class="demo-driver-card" data-user="vikram@commitcon.com" data-zone="Z10">
+            <div class="driver-avatar-circle">🧔🏾</div>
+            <div class="driver-card-info">
+              <div class="driver-card-name">Vikram Sharma <span class="rating">★ 4.95</span></div>
+              <div class="driver-card-meta">📍 Z10 Residential South • Maruti Dzire</div>
+            </div>
+            <div class="demo-select-arrow">➔</div>
+          </div>
+
+          <div class="demo-driver-card" data-user="priya@commitcon.com" data-zone="Z20">
+            <div class="driver-avatar-circle">👩🏽</div>
+            <div class="driver-card-info">
+              <div class="driver-card-name">Priya Patel <span class="rating">★ 4.97</span></div>
+              <div class="driver-card-meta">📍 Z20 IT Corridor South • Honda Amaze</div>
+            </div>
+            <div class="demo-select-arrow">➔</div>
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="password">Password</label>
-          <div class="input-container">
-            <span class="input-icon">🔒</span>
-            <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
-          </div>
-        </div>
-
-        <button type="submit" class="btn btn-primary btn-block">Sign In to Dashboard</button>
-      </form>
-
-      <div class="demo-divider">
-        <span>OR QUICK DEMO LOGIN</span>
-      </div>
-
-      <div class="demo-logins">
-        <p class="demo-hint">Click any driver to test their location & recommendations:</p>
-        <div class="demo-buttons">
-          <button class="demo-chip" data-user="aditya@commitcon.com" data-zone="Z06">
-            <span class="chip-avatar">👨🏽‍💼</span>
-            <span class="chip-text">
-              <strong>Aditya Singh</strong>
-              <small>Z06 Shopping Mall</small>
-            </span>
-          </button>
-
-          <button class="demo-chip" data-user="rajesh@commitcon.com" data-zone="Z13">
-            <span class="chip-avatar">👨🏻‍✈️</span>
-            <span class="chip-text">
-              <strong>Rajesh Kumar</strong>
-              <small>Z13 Entertainment</small>
-            </span>
-          </button>
-
-          <button class="demo-chip" data-user="vikram@commitcon.com" data-zone="Z10">
-            <span class="chip-avatar">🧔🏾</span>
-            <span class="chip-text">
-              <strong>Vikram Sharma</strong>
-              <small>Z10 Residential South</small>
-            </span>
-          </button>
-
-          <button class="demo-chip" data-user="priya@commitcon.com" data-zone="Z20">
-            <span class="chip-avatar">👩🏽</span>
-            <span class="chip-text">
-              <strong>Priya Patel</strong>
-              <small>Z20 IT Corridor South</small>
-            </span>
-          </button>
+        <div class="auth-footer-note">
+          <span>Protected by CommitCon Fleet AI System. 20 City Zones Monitored in Real Time.</span>
         </div>
       </div>
     </div>
   </div>
 
 
-  <!-- ================= DASHBOARD VIEW ================= -->
-  <div id="dashboard-view" class="dashboard-wrapper hidden">
-    <!-- TOP NAVIGATION -->
-    <header class="app-header">
-      <div class="header-left">
-        <div class="header-logo">🚗 CommitCon Driver</div>
-        <div class="driver-badge">
-          <span class="status-dot"></span>
-          <span id="driver-status">Online • Accepting Rides</span>
+  <!-- ================= MAIN APP VIEW (UBER SPLIT SCREEN) ================= -->
+  <div id="dashboard-view" class="uber-app-container hidden">
+
+    <!-- TOP UBER APP HEADER -->
+    <header class="uber-header">
+      <div class="header-section left">
+        <div class="uber-logo-mark">Uber</div>
+        <div class="header-divider"></div>
+        <div class="driver-online-pill" id="driver-status-pill">
+          <span class="status-pulse-dot"></span>
+          <span id="driver-status-text">You're Online</span>
+        </div>
+        <div class="radar-indicator">
+          <span class="radar-wave"></span>
+          <span class="radar-label">Radar Active</span>
         </div>
       </div>
 
-      <div class="header-right">
-        <!-- Zone Switcher for Interactive Testing -->
-        <div class="zone-selector-box">
-          <label for="current-zone-select">My Current Zone:</label>
-          <select id="current-zone-select" class="zone-select">
-            <!-- Populated dynamically -->
+      <div class="header-section center">
+        <!-- Driver's current zone changer -->
+        <div class="zone-pill-selector">
+          <span class="pin-icon">📍</span>
+          <span class="selector-label">My Zone:</span>
+          <select id="current-zone-select" class="zone-dropdown" title="Change starting zone">
+            <!-- Dynamically populated -->
           </select>
         </div>
+      </div>
 
-        <div class="driver-profile-pill">
-          <span id="user-avatar" class="avatar-circle">👨🏽</span>
-          <div class="driver-meta">
-            <span id="user-name" class="driver-name">Aditya Singh</span>
-            <span id="user-car" class="driver-car">Toyota Sedan (KA-01-AB-1234)</span>
+      <div class="header-section right">
+        <!-- Live refresh timer -->
+        <div class="refresh-badge" id="refresh-badge" title="Model refreshed every 15 minutes">
+          <span class="refresh-dot"></span>
+          <span id="model-refresh-label">AI Model Live</span>
+        </div>
+
+        <!-- Driver Profile Menu -->
+        <div class="user-profile-menu">
+          <span id="user-avatar" class="user-avatar">👨🏽‍💼</span>
+          <div class="user-text-meta">
+            <span id="user-name" class="user-name">Aditya Singh</span>
+            <span id="user-rating" class="user-sub">★ 4.92 • <span id="user-car">Toyota Sedan</span></span>
           </div>
         </div>
 
-        <button id="logout-btn" class="btn btn-secondary btn-sm">Sign Out</button>
+        <button id="logout-btn" class="uber-icon-btn" title="Sign Out">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
       </div>
     </header>
 
-    <!-- MAIN APP CONTENT -->
-    <main class="main-content">
 
-      <!-- HERO BANNER / SUB-HEADER -->
-      <section class="overview-banner">
-        <div class="banner-content">
-          <h1>City Fleet Demand & Repositioning</h1>
-          <p id="generated-timestamp">Live Model Predictions • Refreshes every 15 mins</p>
-        </div>
+    <!-- SPLIT SCREEN WRAPPER -->
+    <div class="uber-split-body">
 
-        <!-- TAB NAVIGATION -->
-        <div class="tab-controls">
-          <button id="tab-overall-btn" class="tab-btn active">
-            <span class="tab-icon">🏙️</span>
-            <span>Overall City Demand</span>
+      <!-- ================= LEFT SIDEBAR DRAWER ================= -->
+      <aside class="uber-sidebar" id="uber-sidebar">
+
+        <!-- SEGMENTED TABS -->
+        <div class="uber-segmented-control">
+          <button id="tab-personal-btn" class="seg-btn active">
+            <span class="seg-icon">🎯</span>
+            <span class="seg-text">Recommended for Me</span>
+            <span class="seg-badge" id="personal-badge-count">5</span>
           </button>
-
-          <button id="tab-personal-btn" class="tab-btn highlight-tab">
-            <span class="tab-icon">🎯</span>
-            <span>Recommended Zones for Me</span>
-            <span class="badge-pill" id="personal-count-badge">5</span>
+          <button id="tab-overall-btn" class="seg-btn">
+            <span class="seg-icon">🏙️</span>
+            <span class="seg-text">City Demand</span>
+            <span class="seg-badge" id="total-zones-badge">20</span>
           </button>
         </div>
-      </section>
 
-      <!-- ACTIVE NAVIGATION TOAST -->
-      <div id="nav-alert" class="nav-alert-banner hidden">
-        <div class="nav-icon">🧭</div>
-        <div class="nav-info">
-          <h4 id="nav-title">Repositioning In Progress</h4>
-          <p id="nav-desc">Navigating to Z07 (Railway Station) • ETA: 5 mins</p>
-        </div>
-        <button id="cancel-nav-btn" class="btn btn-sm btn-outline">Cancel</button>
-      </div>
+        <!-- ACTIVE REPOSITION / NAVIGATION CARD (Shows when accepted) -->
+        <div id="active-dispatch-card" class="active-dispatch-card hidden">
+          <div class="dispatch-header">
+            <div class="dispatch-icon-pulse">🚗💨</div>
+            <div class="dispatch-meta">
+              <span class="dispatch-tag">REPOSITIONING IN PROGRESS</span>
+              <h3 id="dispatch-target-name">Navigating to Z02 Airport</h3>
+            </div>
+            <button id="cancel-dispatch-btn" class="btn-cancel-dispatch" title="Cancel trip">✕</button>
+          </div>
 
-      <!-- ================= TAB 1: OVERALL CITY DEMAND ================= -->
-      <div id="view-overall" class="tab-view">
-        <!-- KPI METRICS SUMMARY -->
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon red">📈</div>
-            <div class="stat-data">
-              <span class="stat-label">Total Predicted Demand</span>
-              <span id="total-demand-kpi" class="stat-value">--</span>
-              <span class="stat-sub">Across 20 Zones</span>
+          <div class="dispatch-eta-bar">
+            <div class="eta-item">
+              <span class="eta-label">Estimated Time</span>
+              <strong id="dispatch-eta-val">8 mins</strong>
+            </div>
+            <div class="eta-divider"></div>
+            <div class="eta-item">
+              <span class="eta-label">Distance</span>
+              <strong id="dispatch-dist-val">4.2 km</strong>
+            </div>
+            <div class="eta-divider"></div>
+            <div class="eta-item">
+              <span class="eta-label">Surge Multiplier</span>
+              <strong id="dispatch-surge-val" class="text-surge">⚡ 1.8x</strong>
             </div>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-icon orange">🔥</div>
-            <div class="stat-data">
-              <span class="stat-label">High Surge Zones</span>
-              <span id="surge-zones-kpi" class="stat-value">--</span>
-              <span class="stat-sub">Immediate Driver Need</span>
-            </div>
+          <div class="dispatch-progress-track">
+            <div class="dispatch-progress-fill" id="dispatch-progress-fill"></div>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-icon green">🚘</div>
-            <div class="stat-data">
-              <span class="stat-label">Current Idle Supply</span>
-              <span id="total-supply-kpi" class="stat-value">--</span>
-              <span class="stat-sub">Active Available Drivers</span>
-            </div>
-          </div>
-
-          <div class="stat-card">
-            <div class="stat-icon purple">🎪</div>
-            <div class="stat-data">
-              <span class="stat-label">Major City Events</span>
-              <span id="active-events-kpi" class="stat-value">--</span>
-              <span class="stat-sub">Concerts & Stadium Events</span>
-            </div>
+          <div class="dispatch-actions">
+            <button id="complete-dispatch-btn" class="uber-btn-primary btn-sm full-width">I Have Arrived at Zone</button>
           </div>
         </div>
 
-        <!-- ZONE DEMAND LEADERBOARD -->
-        <div class="content-panel">
-          <div class="panel-header">
-            <div>
-              <h3>All 20 Zones Ranked by Demand</h3>
-              <p class="panel-desc">Calculated by our ML forecasting model (next 60 minutes window)</p>
+        <!-- ================= TAB 1: PERSONALIZED RECOMMENDATIONS ================= -->
+        <div id="panel-personal" class="sidebar-panel-content">
+          <div class="panel-hero-info">
+            <div class="location-chip">
+              <span class="pin">📍</span>
+              <span class="label">Current Location:</span>
+              <strong id="current-zone-badge">Z06 Shopping Mall</strong>
             </div>
-            <button id="refresh-demand-btn" class="btn btn-secondary btn-sm">🔄 Refresh Data</button>
+            <p class="hero-helper">
+              High passenger demand detected nearby. Reposition to earn more and avoid idle wait time.
+            </p>
           </div>
 
-          <div class="table-responsive">
-            <table class="zones-table">
-              <thead>
-                <tr>
-                  <th>Rank & Zone</th>
-                  <th>Forecasted Requests</th>
-                  <th>Demand Level</th>
-                  <th>Drivers Available</th>
-                  <th>Supply Status</th>
-                  <th>Nearby Events</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="zones-table-body">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
+          <!-- FILTERS & SORT INFO -->
+          <div class="quick-meta-strip">
+            <span class="meta-pill">⏱️ Travel ≤ 25 min</span>
+            <span class="meta-pill">⚡ Driver Shortage First</span>
+            <button id="refresh-personal-btn" class="meta-refresh-btn" title="Refresh recommendations">🔄</button>
           </div>
-        </div>
-      </div>
 
-
-      <!-- ================= TAB 2: RECOMMENDED ZONES FOR ME ================= -->
-      <div id="view-personal" class="tab-view hidden">
-        <div class="personal-header-card">
-          <div class="personal-header-left">
-            <div class="location-beacon">📍</div>
-            <div>
-              <h2>Personalized Repositioning Targets</h2>
-              <p>Ranked specifically for your current position in <strong id="personal-current-zone-name">Loading...</strong></p>
+          <!-- CARDS CONTAINER -->
+          <div id="personal-cards-list" class="cards-list">
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <span>Computing optimal repositioning targets...</span>
             </div>
           </div>
-          <div class="personal-header-right">
-            <span class="filter-tag">Max Travel: 25 mins</span>
-            <span class="filter-tag">High Earnings Potential</span>
+        </div>
+
+        <!-- ================= TAB 2: OVERALL CITY DEMAND ================= -->
+        <div id="panel-overall" class="sidebar-panel-content hidden">
+          <!-- METRIC KPI TILES -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <span class="kpi-icon">📈</span>
+              <div class="kpi-info">
+                <span class="kpi-number" id="kpi-total-demand">--</span>
+                <span class="kpi-label">Forecast Demand</span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <span class="kpi-icon">🔥</span>
+              <div class="kpi-info">
+                <span class="kpi-number text-surge" id="kpi-surge-count">--</span>
+                <span class="kpi-label">Surge Shortages</span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <span class="kpi-icon">🚘</span>
+              <div class="kpi-info">
+                <span class="kpi-number" id="kpi-total-supply">--</span>
+                <span class="kpi-label">Active Drivers</span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <span class="kpi-icon">🎪</span>
+              <div class="kpi-info">
+                <span class="kpi-number" id="kpi-events-count">--</span>
+                <span class="kpi-label">Major Events</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEARCH & FILTER ROW -->
+          <div class="city-filter-bar">
+            <div class="search-input-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="zone-search-input" placeholder="Search zone name or ID...">
+            </div>
+            <div class="filter-chips">
+              <button class="filter-chip active" data-filter="all">All (20)</button>
+              <button class="filter-chip" data-filter="shortage">🔥 Shortage</button>
+              <button class="filter-chip" data-filter="events">🎪 Events</button>
+              <button class="filter-chip" data-filter="surplus">🟢 Surplus</button>
+            </div>
+          </div>
+
+          <!-- ALL ZONES LIST -->
+          <div id="all-zones-list" class="cards-list">
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <span>Loading citywide model forecasts...</span>
+            </div>
           </div>
         </div>
 
-        <!-- CARDS GRID -->
-        <div id="personal-cards-container" class="personal-grid">
-          <!-- Dynamically populated -->
-        </div>
-      </div>
+      </aside>
 
-    </main>
+
+      <!-- ================= RIGHT SIDE: FULL MAP CANVAS ================= -->
+      <main class="uber-map-container" id="uber-map-container">
+        <!-- Interactive Leaflet Map -->
+        <div id="map" class="map-canvas"></div>
+
+        <!-- FLOATING MAP CONTROLS -->
+        <div class="map-floating-controls">
+          <button id="map-recenter-btn" class="map-ctrl-btn" title="Recenter on My Vehicle">
+            <span class="ctrl-icon">🎯</span>
+            <span class="ctrl-tooltip">My Location</span>
+          </button>
+
+          <button id="map-theme-btn" class="map-ctrl-btn" title="Toggle Map Style (Light/Dark)">
+            <span class="ctrl-icon">🌙</span>
+            <span class="ctrl-tooltip">Toggle Style</span>
+          </button>
+
+          <button id="map-fit-bounds-btn" class="map-ctrl-btn" title="View Entire City">
+            <span class="ctrl-icon">🏙️</span>
+            <span class="ctrl-tooltip">Whole City</span>
+          </button>
+        </div>
+
+        <!-- FLOATING MAP LEGEND -->
+        <div class="map-floating-legend">
+          <div class="legend-header">
+            <span class="legend-title">Demand Radar</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-dot red"></span>
+            <span class="legend-text">Surge Shortage (Reposition In)</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-dot orange"></span>
+            <span class="legend-text">Balanced Demand (Monitor)</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-dot green"></span>
+            <span class="legend-text">Driver Surplus (Reposition Out)</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-dot car">🚗</span>
+            <span class="legend-text">Your Vehicle</span>
+          </div>
+        </div>
+
+      </main>
+
+    </div>
   </div>
 
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

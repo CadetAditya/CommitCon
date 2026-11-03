@@ -1,15 +1,27 @@
 /**
- * CommitCon Driver Portal - Frontend State Management & API Integration
+ * Uber Driver Intelligence Portal - Application Logic
+ * Integrates FastAPI recommendation endpoints with Leaflet map visualization
  */
 
-// Application State
+// Global Application State
 const state = {
   driver: null,
   currentZone: 'Z06',
-  allZones: [],
-  cityRecommendations: null,
-  personalRecommendations: null,
-  activeNavigation: null,
+  zonesCatalog: [],          // [{zone_id, zone_name, latitude, longitude}]
+  zonesCoordsMap: {},        // 'Z01': {lat, lon, name}
+  cityRecommendations: null, // latest run from /recommendations/latest
+  personalRecommendations: null, // from /api/recommendations/for-me
+  activeDispatch: null,      // {destination_zone_id, zone_name, eta_min, distance_km}
+  dispatchInterval: null,
+
+  // Map state
+  map: null,
+  tileLayer: null,
+  isDarkMap: false,
+  driverMarker: null,
+  zoneMarkers: {},           // 'Z01': L.marker / L.circleMarker
+  routePolyline: null,
+  routePulseMarker: null,
 };
 
 // DOM Elements
@@ -18,42 +30,58 @@ const dashboardView = document.getElementById('dashboard-view');
 const loginForm = document.getElementById('login-form');
 const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
+const togglePasswordBtn = document.getElementById('toggle-password-btn');
+const loginSubmitBtn = document.getElementById('login-submit-btn');
 const loginError = document.getElementById('login-error');
 const logoutBtn = document.getElementById('logout-btn');
 
-const tabOverallBtn = document.getElementById('tab-overall-btn');
-const tabPersonalBtn = document.getElementById('tab-personal-btn');
-const viewOverall = document.getElementById('view-overall');
-const viewPersonal = document.getElementById('view-personal');
-
+// Header
 const currentZoneSelect = document.getElementById('current-zone-select');
+const currentZoneBadge = document.getElementById('current-zone-badge');
 const userNameDisplay = document.getElementById('user-name');
 const userAvatarDisplay = document.getElementById('user-avatar');
+const userRatingDisplay = document.getElementById('user-rating');
 const userCarDisplay = document.getElementById('user-car');
-const driverStatusDisplay = document.getElementById('driver-status');
-const generatedTimestamp = document.getElementById('generated-timestamp');
+const modelRefreshLabel = document.getElementById('model-refresh-label');
 
-const totalDemandKpi = document.getElementById('total-demand-kpi');
-const surgeZonesKpi = document.getElementById('surge-zones-kpi');
-const totalSupplyKpi = document.getElementById('total-supply-kpi');
-const activeEventsKpi = document.getElementById('active-events-kpi');
-const zonesTableBody = document.getElementById('zones-table-body');
-const refreshDemandBtn = document.getElementById('refresh-demand-btn');
+// Tabs
+const tabPersonalBtn = document.getElementById('tab-personal-btn');
+const tabOverallBtn = document.getElementById('tab-overall-btn');
+const panelPersonal = document.getElementById('panel-personal');
+const panelOverall = document.getElementById('panel-overall');
+const personalBadgeCount = document.getElementById('personal-badge-count');
+const personalCardsList = document.getElementById('personal-cards-list');
+const refreshPersonalBtn = document.getElementById('refresh-personal-btn');
 
-const personalCurrentZoneName = document.getElementById('personal-current-zone-name');
-const personalCardsContainer = document.getElementById('personal-cards-container');
-const personalCountBadge = document.getElementById('personal-count-badge');
+// City Demand
+const allZonesList = document.getElementById('all-zones-list');
+const zoneSearchInput = document.getElementById('zone-search-input');
+const kpiTotalDemand = document.getElementById('kpi-total-demand');
+const kpiSurgeCount = document.getElementById('kpi-surge-count');
+const kpiTotalSupply = document.getElementById('kpi-total-supply');
+const kpiEventsCount = document.getElementById('kpi-events-count');
 
-const navAlert = document.getElementById('nav-alert');
-const navTitle = document.getElementById('nav-title');
-const navDesc = document.getElementById('nav-desc');
-const cancelNavBtn = document.getElementById('cancel-nav-btn');
+// Active Dispatch Card
+const activeDispatchCard = document.getElementById('active-dispatch-card');
+const dispatchTargetName = document.getElementById('dispatch-target-name');
+const dispatchEtaVal = document.getElementById('dispatch-eta-val');
+const dispatchDistVal = document.getElementById('dispatch-dist-val');
+const dispatchSurgeVal = document.getElementById('dispatch-surge-val');
+const cancelDispatchBtn = document.getElementById('cancel-dispatch-btn');
+const completeDispatchBtn = document.getElementById('complete-dispatch-btn');
+
+// Map Controls
+const mapRecenterBtn = document.getElementById('map-recenter-btn');
+const mapThemeBtn = document.getElementById('map-theme-btn');
+const mapFitBoundsBtn = document.getElementById('map-fit-bounds-btn');
+
 
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
+  await loadZonesCatalog();
   checkExistingSession();
 });
 
@@ -61,10 +89,21 @@ function setupEventListeners() {
   loginForm.addEventListener('submit', handleLogin);
   logoutBtn.addEventListener('click', handleLogout);
 
-  // Demo driver chips
-  document.querySelectorAll('.demo-chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      const user = chip.getAttribute('data-user');
+  // Password visibility toggle
+  togglePasswordBtn.addEventListener('click', () => {
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      togglePasswordBtn.textContent = 'Hide';
+    } else {
+      passwordInput.type = 'password';
+      togglePasswordBtn.textContent = 'Show';
+    }
+  });
+
+  // Demo driver cards in login
+  document.querySelectorAll('.demo-driver-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const user = card.getAttribute('data-user');
       usernameInput.value = user;
       passwordInput.value = 'password123';
       handleLogin(new Event('submit'));
@@ -72,355 +111,768 @@ function setupEventListeners() {
   });
 
   // Tab switching
-  tabOverallBtn.addEventListener('click', () => switchTab('overall'));
   tabPersonalBtn.addEventListener('click', () => switchTab('personal'));
+  tabOverallBtn.addEventListener('click', () => switchTab('overall'));
 
-  // Zone selector change
+  // Zone selector in header
   currentZoneSelect.addEventListener('change', async (e) => {
-    state.currentZone = e.target.value;
-    if (state.driver) {
-      state.driver.current_zone_id = state.currentZone;
-      localStorage.setItem('commitcon_driver', JSON.stringify(state.driver));
-    }
+    const newZone = e.target.value;
+    await setDriverCurrentZone(newZone);
+  });
+
+  refreshPersonalBtn.addEventListener('click', async () => {
+    refreshPersonalBtn.classList.add('spinning');
     await loadPersonalRecommendations();
+    refreshPersonalBtn.classList.remove('spinning');
   });
 
-  refreshDemandBtn.addEventListener('click', () => {
-    loadOverallCityDemand();
+  // City Search & Filters
+  zoneSearchInput.addEventListener('input', () => filterCityZones());
+  document.querySelectorAll('.filter-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      filterCityZones();
+    });
   });
 
-  cancelNavBtn.addEventListener('click', () => {
-    state.activeNavigation = null;
-    navAlert.classList.add('hidden');
-    driverStatusDisplay.textContent = 'Online • Accepting Rides';
-    driverStatusDisplay.parentElement.style.background = 'var(--success-bg)';
-  });
+  // Dispatch actions
+  cancelDispatchBtn.addEventListener('click', cancelDispatch);
+  completeDispatchBtn.addEventListener('click', completeDispatch);
+
+  // Map controls
+  mapRecenterBtn.addEventListener('click', centerOnDriver);
+  mapThemeBtn.addEventListener('click', toggleMapTheme);
+  mapFitBoundsBtn.addEventListener('click', fitAllZones);
 }
 
+
 // ============================================================================
-// AUTHENTICATION
+// SESSION & AUTHENTICATION
 // ============================================================================
 function checkExistingSession() {
-  const savedDriver = localStorage.getItem('commitcon_driver');
+  const savedDriver = localStorage.getItem('uber_driver_session');
   if (savedDriver) {
     try {
       state.driver = JSON.parse(savedDriver);
       state.currentZone = state.driver.current_zone_id || 'Z06';
       showDashboard();
-    } catch (e) {
-      localStorage.removeItem('commitcon_driver');
+    } catch {
+      localStorage.removeItem('uber_driver_session');
+      showAuth();
     }
+  } else {
+    showAuth();
   }
 }
 
 async function handleLogin(e) {
-  if (e) e.preventDefault();
+  e.preventDefault();
   loginError.classList.add('hidden');
+  loginSubmitBtn.disabled = true;
+  loginSubmitBtn.textContent = 'Signing In...';
 
   const username = usernameInput.value.trim();
-  const password = passwordInput.value.trim();
-
-  if (!username || !password) {
-    showLoginError('Please enter your email or phone number and password.');
-    return;
-  }
+  const password = passwordInput.value;
 
   try {
     const response = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username_or_email: username, password }),
+      body: JSON.stringify({
+        username_or_email: username,
+        password: password,
+      }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Authentication failed');
+      throw new Error('Authentication failed. Please check credentials.');
     }
 
     const data = await response.json();
     state.driver = data.driver;
     state.currentZone = data.driver.current_zone_id || 'Z06';
-    localStorage.setItem('commitcon_driver', JSON.stringify(state.driver));
+    localStorage.setItem('uber_driver_session', JSON.stringify(state.driver));
 
     showDashboard();
   } catch (err) {
-    showLoginError(err.message || 'Unable to connect to server. Please try again.');
+    loginError.textContent = err.message || 'Error signing in. Try again.';
+    loginError.classList.remove('hidden');
+  } finally {
+    loginSubmitBtn.disabled = false;
+    loginSubmitBtn.textContent = 'Continue';
   }
-}
-
-function showLoginError(msg) {
-  loginError.textContent = msg;
-  loginError.classList.remove('hidden');
 }
 
 function handleLogout() {
+  localStorage.removeItem('uber_driver_session');
   state.driver = null;
-  localStorage.removeItem('commitcon_driver');
-  dashboardView.classList.add('hidden');
-  authView.classList.remove('hidden');
+  if (state.dispatchInterval) clearInterval(state.dispatchInterval);
+  state.activeDispatch = null;
+  showAuth();
 }
 
-function showDashboard() {
+function showAuth() {
+  authView.classList.remove('hidden');
+  dashboardView.classList.add('hidden');
+}
+
+async function showDashboard() {
   authView.classList.add('hidden');
   dashboardView.classList.remove('hidden');
 
-  // Populate driver profile
-  userNameDisplay.textContent = state.driver.name;
-  userAvatarDisplay.textContent = state.driver.avatar || '👨🏽';
-  userCarDisplay.textContent = state.driver.vehicle || 'Toyota Sedan (KA-01-AB-1234)';
+  // Populate driver UI
+  userNameDisplay.textContent = state.driver.name || 'Aditya Singh';
+  userAvatarDisplay.textContent = state.driver.avatar || '👨🏽‍💼';
+  userCarDisplay.textContent = state.driver.vehicle || 'Toyota Sedan';
+  userRatingDisplay.innerHTML = `★ ${state.driver.rating ? state.driver.rating.toFixed(2) : '4.92'} • <span id="user-car">${state.driver.vehicle || 'Toyota Sedan'}</span>`;
 
-  // Populate all zones into dropdown and load data
-  loadZoneList().then(() => {
-    loadOverallCityDemand();
-    loadPersonalRecommendations();
-  });
+  // Init Map if not yet created
+  initMap();
+
+  // Populate zone selector dropdown
+  populateZoneSelector();
+
+  // Load data
+  await Promise.all([
+    loadOverallCityDemand(),
+    loadPersonalRecommendations(),
+  ]);
+
+  // Recenter map on driver
+  centerOnDriver();
 }
 
+
 // ============================================================================
-// DATA FETCHING
+// DATA LOADING
 // ============================================================================
-async function loadZoneList() {
+async function loadZonesCatalog() {
   try {
     const res = await fetch('/api/zones');
     if (res.ok) {
-      state.allZones = await res.json();
-      currentZoneSelect.innerHTML = '';
-      state.allZones.forEach((z) => {
-        const opt = document.createElement('option');
-        opt.value = z.zone_id;
-        opt.textContent = `${z.zone_id} - ${z.zone_name}`;
-        if (z.zone_id === state.currentZone) {
-          opt.selected = true;
-        }
-        currentZoneSelect.appendChild(opt);
+      const data = await res.json();
+      state.zonesCatalog = data;
+      state.zonesCoordsMap = {};
+      data.forEach((z) => {
+        state.zonesCoordsMap[z.zone_id] = {
+          lat: z.latitude || 12.9716,
+          lon: z.longitude || 77.5946,
+          name: z.zone_name,
+        };
       });
     }
-  } catch (e) {
-    console.error('Failed to load zones list', e);
+  } catch (err) {
+    console.error('Failed to load zones catalog:', err);
   }
 }
 
+function populateZoneSelector() {
+  currentZoneSelect.innerHTML = '';
+  state.zonesCatalog.forEach((z) => {
+    const opt = document.createElement('option');
+    opt.value = z.zone_id;
+    opt.textContent = `${z.zone_id} - ${z.zone_name}`;
+    if (z.zone_id === state.currentZone) {
+      opt.selected = true;
+    }
+    currentZoneSelect.appendChild(opt);
+  });
+
+  const currentZoneObj = state.zonesCatalog.find((z) => z.zone_id === state.currentZone);
+  if (currentZoneObj) {
+    currentZoneBadge.textContent = `${currentZoneObj.zone_id} ${currentZoneObj.zone_name}`;
+  }
+}
+
+async function setDriverCurrentZone(newZoneId) {
+  state.currentZone = newZoneId;
+  if (state.driver) {
+    state.driver.current_zone_id = newZoneId;
+    localStorage.setItem('uber_driver_session', JSON.stringify(state.driver));
+  }
+
+  const currentZoneObj = state.zonesCatalog.find((z) => z.zone_id === newZoneId);
+  if (currentZoneObj) {
+    currentZoneBadge.textContent = `${currentZoneObj.zone_id} ${currentZoneObj.zone_name}`;
+  }
+
+  // Update driver marker on map
+  updateDriverMarker();
+
+  // Reload personalized recommendations
+  await loadPersonalRecommendations();
+
+  // Recenter
+  centerOnDriver();
+}
+
+/**
+ * Load overall city recommendations (Phase 4 & 5 endpoints)
+ */
 async function loadOverallCityDemand() {
   try {
-    refreshDemandBtn.textContent = '⏳ Loading...';
     const res = await fetch('/recommendations/latest');
-    if (!res.ok) throw new Error('Could not fetch recommendations');
+    if (!res.ok) throw new Error('Failed to fetch recommendations');
     const data = await res.json();
     state.cityRecommendations = data;
 
-    // Update timestamp
-    const date = new Date(data.generated_at);
-    generatedTimestamp.textContent = `Live Model Predictions • Updated ${date.toLocaleTimeString()} (Refreshes every 15m)`;
+    // Update KPI tiles
+    let totalDemand = 0;
+    let shortageCount = 0;
+    let totalDrivers = 0;
 
-    // Calculate KPI summaries
-    const totalRequests = data.zones.reduce((sum, z) => sum + z.predicted_requests, 0);
-    const totalIdleDrivers = data.zones.reduce((sum, z) => sum + z.available_drivers, 0);
-    const surgeZonesCount = data.summary.reposition_in || 0;
+    data.zones.forEach((z) => {
+      totalDemand += z.predicted_requests || 0;
+      totalDrivers += z.available_drivers || 0;
+      if (z.recommended_action === 'REPOSITION_IN' || (z.supply_gap && z.supply_gap >= 2)) {
+        shortageCount += 1;
+      }
+    });
 
-    totalDemandKpi.textContent = totalRequests;
-    surgeZonesKpi.textContent = surgeZonesCount;
-    totalSupplyKpi.textContent = totalIdleDrivers;
-    activeEventsKpi.textContent = '6 Active';
+    kpiTotalDemand.textContent = totalDemand;
+    kpiSurgeCount.textContent = shortageCount;
+    kpiTotalSupply.textContent = totalDrivers;
+    kpiEventsCount.textContent = '3 Live';
 
-    // Render Table
-    renderCityDemandTable(data.zones);
+    // Model refresh label
+    if (data.generated_at) {
+      const timeStr = new Date(data.generated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      modelRefreshLabel.textContent = `Model Live (${timeStr})`;
+    }
+
+    renderCityZonesList(data.zones);
+    renderMapZoneMarkers(data.zones);
   } catch (err) {
-    console.error('Error fetching city demand:', err);
-  } finally {
-    refreshDemandBtn.textContent = '🔄 Refresh Data';
+    console.error('Failed to load city demand:', err);
+    allZonesList.innerHTML = `<div class="loading-state">Error loading recommendations: ${err.message}</div>`;
   }
 }
 
-function renderCityDemandTable(zones) {
-  zonesTableBody.innerHTML = '';
-
-  // Sort by highest predicted requests first so driver sees where the action is
-  const sortedByDemand = [...zones].sort((a, b) => b.predicted_requests - a.predicted_requests);
-  const maxRequests = Math.max(...zones.map((z) => z.predicted_requests), 1);
-
-  sortedByDemand.forEach((zone, index) => {
-    const tr = document.createElement('tr');
-
-    const fillPercent = Math.min(100, Math.round((zone.predicted_requests / maxRequests) * 100));
-    let demandLevel = 'Normal';
-    let fillClass = 'normal';
-    let badgeClass = 'status-pill steady';
-
-    if (zone.predicted_requests >= 12) {
-      demandLevel = '🔥 High Demand';
-      fillClass = 'high';
-      badgeClass = 'status-pill surge';
-    } else if (zone.predicted_requests >= 6) {
-      demandLevel = '⚡ Moderate';
-      fillClass = 'medium';
-      badgeClass = 'status-pill moderate';
-    }
-
-    // Supply gap presentation
-    let gapHtml = `<span class="gap-pill balanced">Balanced (0)</span>`;
-    if (zone.supply_gap > 0) {
-      gapHtml = `<span class="gap-pill shortage">Shortage (+${zone.supply_gap} needed)</span>`;
-    } else if (zone.supply_gap < 0) {
-      gapHtml = `<span class="gap-pill surplus">Surplus (${Math.abs(zone.supply_gap)} excess)</span>`;
-    }
-
-    // Event tag
-    const hasEvent = zone.reason_codes.includes('EVENT_NEARBY');
-    const eventHtml = hasEvent ? `<span class="event-tag">🎪 Active Event</span>` : `<span style="color: #64748B;">None</span>`;
-
-    tr.innerHTML = `
-      <td>
-        <span class="zone-id-tag">${zone.zone_id}</span>
-        <span class="zone-title">${zone.zone_name}</span>
-      </td>
-      <td>
-        <div class="demand-bar-container">
-          <span class="demand-num">${zone.predicted_requests}</span>
-          <div class="demand-bar">
-            <div class="demand-bar-fill ${fillClass}" style="width: ${fillPercent}%"></div>
-          </div>
-        </div>
-      </td>
-      <td>
-        <span class="${badgeClass}">${demandLevel}</span>
-      </td>
-      <td>
-        <strong>${zone.available_drivers}</strong> idle
-      </td>
-      <td>
-        ${gapHtml}
-      </td>
-      <td>
-        ${eventHtml}
-      </td>
-      <td>
-        <button class="btn btn-secondary btn-sm" onclick="dispatchToZone('${zone.zone_id}', '${zone.zone_name}')">
-          Target Zone
-        </button>
-      </td>
-    `;
-    zonesTableBody.appendChild(tr);
-  });
-}
-
-// ============================================================================
-// PERSONALIZED RECOMMENDATIONS (FOR ME)
-// ============================================================================
+/**
+ * Load personalized recommendations for current driver location
+ */
 async function loadPersonalRecommendations() {
-  personalCardsContainer.innerHTML = '<div style="color: #94A3B8; padding: 20px;">Computing closest high-demand zones for you...</div>';
+  personalCardsList.innerHTML = `
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <span>Computing optimal repositioning targets from ${state.currentZone}...</span>
+    </div>
+  `;
 
   try {
-    const res = await fetch(`/api/recommendations/for-me?zone_id=${state.currentZone}`);
-    if (!res.ok) throw new Error('Failed to compute personalized recommendations');
+    const res = await fetch(`/api/recommendations/for-me?zone_id=${state.currentZone}&limit=6`);
+    if (!res.ok) throw new Error('Failed to fetch personalized recommendations');
     const data = await res.json();
     state.personalRecommendations = data;
 
-    personalCurrentZoneName.textContent = `${data.driver_current_zone.zone_id} (${data.driver_current_zone.zone_name})`;
-    personalCountBadge.textContent = data.recommendations.length;
-
     renderPersonalCards(data.recommendations);
   } catch (err) {
-    console.error('Error fetching personal recommendations:', err);
-    personalCardsContainer.innerHTML = `<div style="color: #EF4444; padding: 20px;">Error: ${err.message}</div>`;
+    console.error('Failed to load personal recommendations:', err);
+    personalCardsList.innerHTML = `<div class="loading-state">Error: ${err.message}</div>`;
   }
 }
 
-function renderPersonalCards(recommendations) {
-  personalCardsContainer.innerHTML = '';
 
-  if (!recommendations || recommendations.length === 0) {
-    personalCardsContainer.innerHTML = `
-      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #94A3B8;">
-        <h3>No Urgent Repositioning Needed</h3>
-        <p style="margin-top: 8px;">Your current zone has sufficient driver coverage. Stay online to receive passenger trip dispatches!</p>
+// ============================================================================
+// UI RENDERING - CARDS & LISTS
+// ============================================================================
+function renderPersonalCards(recs) {
+  if (!recs || recs.length === 0) {
+    personalCardsList.innerHTML = `
+      <div class="loading-state">
+        <span>No urgent repositioning targets needed from this zone. Local demand is well-balanced.</span>
       </div>
     `;
+    personalBadgeCount.textContent = '0';
     return;
   }
 
-  recommendations.forEach((item, index) => {
-    const card = document.createElement('div');
-    card.className = `rec-card ${index === 0 ? 'top-rank' : ''}`;
+  personalBadgeCount.textContent = recs.length;
+  personalCardsList.innerHTML = '';
 
-    const reasonPills = item.reason_codes
-      .map((r) => `<span class="reason-pill">${r.replace(/_/g, ' ')}</span>`)
-      .join('');
+  recs.forEach((rec, idx) => {
+    const card = document.createElement('div');
+    card.className = 'uber-reposition-card';
+    card.setAttribute('data-zone-id', rec.zone_id);
+
+    const isHighSurge = rec.supply_gap >= 3;
+    const badgeText = rec.badge || (isHighSurge ? 'High Demand Surge' : 'Quick Reposition');
+    const badgeClass = isHighSurge ? 'surge-badge' : 'quick-badge';
+    const surgeMultiplier = (1.0 + (Math.max(rec.supply_gap, 1) * 0.15)).toFixed(1);
 
     card.innerHTML = `
-      <div>
-        <div class="rec-card-top">
-          <div>
-            <span class="rec-zone-id">${item.zone_id}</span>
-            <h3 class="rec-zone-title">${item.zone_name}</h3>
-          </div>
-          <span class="rec-badge">${item.badge}</span>
+      <div class="card-top-row">
+        <div class="card-badge-row">
+          <span class="rank-badge">#${idx + 1}</span>
+          <span class="${badgeClass}">⚡ ${badgeText}</span>
         </div>
+        <span class="card-eta-pill">⏱️ ${rec.travel_time_min}m (${rec.distance_km} km)</span>
+      </div>
 
-        <div class="rec-stats-row">
-          <div class="rec-stat-col">
-            <span class="rec-stat-num" style="color: #60A5FA;">⏱️ ${item.travel_time_min}m</span>
-            <span class="rec-stat-label">Travel (${item.distance_km} km)</span>
-          </div>
-          <div class="rec-stat-col">
-            <span class="rec-stat-num" style="color: #F87171;">+${item.supply_gap}</span>
-            <span class="rec-stat-label">Driver Gap</span>
-          </div>
-          <div class="rec-stat-col">
-            <span class="rec-stat-num" style="color: #34D399;">${item.predicted_requests}</span>
-            <span class="rec-stat-label">Forecast Demand</span>
-          </div>
+      <div class="card-zone-heading">
+        <h4 class="card-zone-title">${rec.zone_id} ${rec.zone_name}</h4>
+        <span class="card-zone-sub">Surge Estimate: <strong>${surgeMultiplier}x</strong> • Score: ${rec.opportunity_score}</span>
+      </div>
+
+      <div class="card-stats-grid">
+        <div class="stat-cell">
+          <span class="stat-cell-label">Driver Need</span>
+          <span class="stat-cell-val shortage">+${rec.supply_gap} Drivers</span>
         </div>
-
-        <div class="rec-reasons">
-          ${reasonPills}
+        <div class="stat-cell">
+          <span class="stat-cell-label">Forecast Demand</span>
+          <span class="stat-cell-val demand">${rec.predicted_requests} Rides</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-cell-label">Active Fleet</span>
+          <span class="stat-cell-val">${rec.available_drivers} Idle</span>
         </div>
       </div>
 
-      <button class="btn btn-reposition" onclick="acceptReposition('${item.zone_id}', '${item.zone_name}', ${item.travel_time_min})">
-        Accept Reposition & Navigate 🚀
-      </button>
+      <div class="card-reason-chips">
+        ${(rec.reason_codes || []).slice(0, 3).map((c) => `<span class="reason-chip">${formatReason(c)}</span>`).join('')}
+      </div>
+
+      <div class="card-action-row">
+        <button class="uber-btn-primary btn-sm btn-accept" style="flex: 2;">
+          <span>Accept Reposition</span> ➔
+        </button>
+        <button class="uber-btn-secondary btn-preview" style="flex: 1;">
+          <span>Map View</span>
+        </button>
+      </div>
     `;
-    personalCardsContainer.appendChild(card);
+
+    // Click card / preview
+    card.addEventListener('click', (e) => {
+      if (!e.target.closest('.btn-accept')) {
+        previewZoneOnMap(rec.zone_id);
+      }
+    });
+
+    // Accept button
+    const acceptBtn = card.querySelector('.btn-accept');
+    acceptBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      startDispatch(rec);
+    });
+
+    personalCardsList.appendChild(card);
   });
 }
 
-// ============================================================================
-// ACTIONS & NAVIGATION
-// ============================================================================
-function switchTab(tabName) {
-  if (tabName === 'overall') {
-    tabOverallBtn.classList.add('active');
-    tabPersonalBtn.classList.remove('active');
-    viewOverall.classList.remove('hidden');
-    viewPersonal.classList.add('hidden');
-  } else {
+function renderCityZonesList(zones) {
+  allZonesList.innerHTML = '';
+  zones.forEach((z, idx) => {
+    const item = document.createElement('div');
+    item.className = 'city-zone-item';
+    item.setAttribute('data-zone-id', z.zone_id);
+    item.setAttribute('data-action', z.recommended_action);
+    item.setAttribute('data-name', z.zone_name.toLowerCase());
+
+    let actionClass = 'monitor';
+    let actionText = 'Monitor';
+    if (z.recommended_action === 'REPOSITION_IN') {
+      actionClass = 'reposition-in';
+      actionText = `+${z.supply_gap} Shortage`;
+    } else if (z.recommended_action === 'REPOSITION_OUT') {
+      actionClass = 'reposition-out';
+      actionText = `${Math.abs(z.supply_gap)} Surplus`;
+    }
+
+    item.innerHTML = `
+      <div class="zone-item-left">
+        <div class="zone-rank-circle">#${idx + 1}</div>
+        <div>
+          <div class="zone-item-name">${z.zone_id} ${z.zone_name}</div>
+          <div class="zone-item-sub">${z.available_drivers} drivers available</div>
+        </div>
+      </div>
+      <div class="zone-item-right">
+        <span class="zone-demand-num">${z.predicted_requests} reqs</span>
+        <span class="zone-action-pill ${actionClass}">${actionText}</span>
+      </div>
+    `;
+
+    item.addEventListener('click', () => {
+      previewZoneOnMap(z.zone_id);
+    });
+
+    allZonesList.appendChild(item);
+  });
+}
+
+function filterCityZones() {
+  const query = zoneSearchInput.value.toLowerCase().trim();
+  const activeChip = document.querySelector('.filter-chip.active');
+  const filterType = activeChip ? activeChip.getAttribute('data-filter') : 'all';
+
+  document.querySelectorAll('.city-zone-item').forEach((item) => {
+    const name = item.getAttribute('data-name');
+    const zid = item.getAttribute('data-zone-id').toLowerCase();
+    const action = item.getAttribute('data-action');
+
+    const matchesQuery = !query || name.includes(query) || zid.includes(query);
+    let matchesFilter = true;
+
+    if (filterType === 'shortage') {
+      matchesFilter = action === 'REPOSITION_IN';
+    } else if (filterType === 'surplus') {
+      matchesFilter = action === 'REPOSITION_OUT';
+    } else if (filterType === 'events') {
+      // Show top demand zones
+      matchesFilter = parseInt(item.querySelector('.zone-demand-num').textContent) > 20;
+    }
+
+    if (matchesQuery && matchesFilter) {
+      item.style.display = 'flex';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+function switchTab(tab) {
+  if (tab === 'personal') {
     tabPersonalBtn.classList.add('active');
     tabOverallBtn.classList.remove('active');
-    viewPersonal.classList.remove('hidden');
-    viewOverall.classList.add('hidden');
-    loadPersonalRecommendations();
+    panelPersonal.classList.remove('hidden');
+    panelOverall.classList.add('hidden');
+  } else {
+    tabPersonalBtn.classList.remove('active');
+    tabOverallBtn.classList.add('active');
+    panelPersonal.classList.add('hidden');
+    panelOverall.classList.remove('hidden');
   }
 }
 
-window.acceptReposition = function (zoneId, zoneName, travelTime) {
-  state.activeNavigation = { zoneId, zoneName, travelTime };
-  navTitle.textContent = `Repositioning Accepted: ${zoneName} (${zoneId})`;
-  navDesc.textContent = `Route activated • Estimated driving time: ${travelTime} mins • Surge bonus active`;
-  navAlert.classList.remove('hidden');
+function formatReason(code) {
+  const map = {
+    CRITICAL_DRIVER_SHORTAGE: 'Severe Driver Shortage',
+    DRIVER_SHORTAGE: 'High Passenger Gap',
+    HIGH_FORECAST_DEMAND: 'Peak Demand Forecast',
+    EVENT_NEARBY: 'Live Event Nearby',
+    FAST_TRAVEL_TIME: 'Fast ETA (<15m)',
+    PEAK_HOUR: 'Peak Commute Hour',
+    HIGH_WAIT_TIME: 'High Wait Times',
+  };
+  return map[code] || code.replace(/_/g, ' ');
+}
 
-  driverStatusDisplay.textContent = `En Route to ${zoneId}`;
-  driverStatusDisplay.parentElement.style.background = 'var(--warning-bg)';
-  driverStatusDisplay.parentElement.style.color = '#FBBF24';
-  driverStatusDisplay.parentElement.style.borderColor = 'rgba(245, 158, 11, 0.4)';
 
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-};
+// ============================================================================
+// MAP VISUALIZATION (LEAFLET INTEGRATION)
+// ============================================================================
+function initMap() {
+  if (state.map) return; // already initialized
 
-window.dispatchToZone = function (zoneId, zoneName) {
-  // Quickly switch to personalized tab with this zone or prompt navigate
-  state.activeNavigation = { zoneId, zoneName, travelTime: 12 };
-  navTitle.textContent = `Targeting Zone: ${zoneName} (${zoneId})`;
-  navDesc.textContent = `Driver reposition dispatch initiated. Head towards ${zoneName}.`;
-  navAlert.classList.remove('hidden');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Default coordinate: Downtown Bengaluru
+  const centerLat = 12.9716;
+  const centerLon = 77.5946;
+
+  // Initialize Leaflet Map
+  state.map = L.map('map', {
+    center: [centerLat, centerLon],
+    zoom: 12,
+    zoomControl: false, // will position custom zoom if needed
+  });
+
+  // Custom Zoom Control on bottom-left
+  L.control.zoom({ position: 'bottomleft' }).addTo(state.map);
+
+  // Default CartoDB Positron (Uber clean light style)
+  setMapTiles(false);
+
+  // Render initial driver marker
+  updateDriverMarker();
+}
+
+function setMapTiles(dark = false) {
+  if (state.tileLayer) {
+    state.map.removeLayer(state.tileLayer);
+  }
+
+  state.isDarkMap = dark;
+  const tileUrl = dark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+  state.tileLayer = L.tileLayer(tileUrl, {
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+    maxZoom: 19,
+    subdomains: 'abcd',
+  }).addTo(state.map);
+}
+
+function toggleMapTheme() {
+  setMapTiles(!state.isDarkMap);
+  mapThemeBtn.querySelector('.ctrl-icon').textContent = state.isDarkMap ? '☀️' : '🌙';
+}
+
+function getZoneLatLng(zoneId) {
+  if (state.zonesCoordsMap[zoneId]) {
+    return [state.zonesCoordsMap[zoneId].lat, state.zonesCoordsMap[zoneId].lon];
+  }
+  return [12.9716, 77.5946];
+}
+
+/**
+ * Driver vehicle marker with glowing animated pulse ring
+ */
+function updateDriverMarker() {
+  if (!state.map) return;
+
+  const [lat, lon] = getZoneLatLng(state.currentZone);
+
+  if (state.driverMarker) {
+    state.driverMarker.setLatLng([lat, lon]);
+  } else {
+    const driverIcon = L.divIcon({
+      className: 'custom-driver-marker',
+      html: `
+        <div class="driver-marker-pulse"></div>
+        <div class="driver-marker-car">🚗</div>
+      `,
+      iconSize: [48, 48],
+      iconAnchor: [24, 24],
+    });
+
+    state.driverMarker = L.marker([lat, lon], {
+      icon: driverIcon,
+      zIndexOffset: 1000,
+    }).addTo(state.map);
+
+    state.driverMarker.bindTooltip(`<strong>My Location</strong><br>${state.currentZone}`, {
+      direction: 'top',
+      offset: [0, -20],
+      permanent: false,
+    });
+  }
+}
+
+/**
+ * Render all 20 zone markers with demand status rings
+ */
+function renderMapZoneMarkers(zones) {
+  if (!state.map || !zones) return;
+
+  // Clear existing
+  Object.values(state.zoneMarkers).forEach((marker) => {
+    state.map.removeLayer(marker);
+  });
+  state.zoneMarkers = {};
+
+  zones.forEach((z) => {
+    const coords = getZoneLatLng(z.zone_id);
+    let colorClass = 'orange';
+    if (z.recommended_action === 'REPOSITION_IN') colorClass = 'red';
+    else if (z.recommended_action === 'REPOSITION_OUT') colorClass = 'green';
+
+    const pinHtml = `
+      <div class="zone-marker-pin ${colorClass}">
+        <span>${z.zone_id}</span>
+      </div>
+    `;
+
+    const icon = L.divIcon({
+      className: 'custom-zone-marker',
+      html: pinHtml,
+      iconSize: [40, 24],
+      iconAnchor: [20, 12],
+    });
+
+    const marker = L.marker(coords, { icon: icon }).addTo(state.map);
+
+    // Uber Popup
+    const popupContent = `
+      <div class="uber-popup">
+        <h4>${z.zone_id} • ${z.zone_name}</h4>
+        <div class="popup-sub">${z.recommended_action.replace(/_/g, ' ')} • Status</div>
+        <div class="popup-stats">
+          <div>
+            <div class="popup-stat-label">Forecast Demand</div>
+            <div class="popup-stat-value">${z.predicted_requests} rides</div>
+          </div>
+          <div>
+            <div class="popup-stat-label">Driver Gap</div>
+            <div class="popup-stat-value text-surge">${z.supply_gap > 0 ? '+' : ''}${z.supply_gap}</div>
+          </div>
+        </div>
+        <button class="popup-reposition-btn" onclick="window.dispatchToZone('${z.zone_id}')">
+          Reposition Here ➔
+        </button>
+      </div>
+    `;
+
+    marker.bindPopup(popupContent);
+    state.zoneMarkers[z.zone_id] = marker;
+  });
+}
+
+function previewZoneOnMap(zoneId) {
+  if (!state.map) return;
+  const coords = getZoneLatLng(zoneId);
+
+  // Highlight card
+  document.querySelectorAll('.uber-reposition-card').forEach((c) => {
+    c.classList.toggle('active-target', c.getAttribute('data-zone-id') === zoneId);
+  });
+
+  // Pan to zone and open popup
+  state.map.flyTo(coords, 14, { duration: 1.2 });
+  if (state.zoneMarkers[zoneId]) {
+    setTimeout(() => {
+      state.zoneMarkers[zoneId].openPopup();
+    }, 1200);
+  }
+
+  // Draw preview polyline
+  drawRouteLine(state.currentZone, zoneId, false);
+}
+
+function centerOnDriver() {
+  if (!state.map) return;
+  const coords = getZoneLatLng(state.currentZone);
+  state.map.flyTo(coords, 13, { duration: 1.0 });
+}
+
+function fitAllZones() {
+  if (!state.map || state.zonesCatalog.length === 0) return;
+  const latLngs = state.zonesCatalog.map((z) => [z.latitude || 12.9716, z.longitude || 77.5946]);
+  state.map.fitBounds(L.latLngBounds(latLngs), { padding: [50, 50] });
+}
+
+/**
+ * Draw animated routing line between driver location and target zone
+ */
+function drawRouteLine(startZoneId, targetZoneId, isActiveNav = true) {
+  if (!state.map) return;
+
+  if (state.routePolyline) {
+    state.map.removeLayer(state.routePolyline);
+    state.routePolyline = null;
+  }
+
+  const startCoords = getZoneLatLng(startZoneId);
+  const endCoords = getZoneLatLng(targetZoneId);
+
+  // Route styling
+  const color = isActiveNav ? '#276EF1' : '#000000';
+  const dashArray = isActiveNav ? null : '6, 8';
+
+  state.routePolyline = L.polyline([startCoords, endCoords], {
+    color: color,
+    weight: 4,
+    opacity: 0.85,
+    dashArray: dashArray,
+    lineCap: 'round',
+  }).addTo(state.map);
+
+  // Fit bounds to show entire route
+  state.map.fitBounds(state.routePolyline.getBounds(), {
+    padding: [60, 60],
+    maxZoom: 14,
+  });
+}
+
+
+// ============================================================================
+// DISPATCH & REPOSITION NAVIGATION
+// ============================================================================
+async function startDispatch(rec) {
+  try {
+    const res = await fetch('/api/drivers/accept-reposition', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        driver_id: state.driver.id || 'DRV_101',
+        destination_zone_id: rec.zone_id,
+      }),
+    });
+
+    if (!res.ok) throw new Error('Dispatch failed');
+
+    state.activeDispatch = {
+      destination_zone_id: rec.zone_id,
+      zone_name: rec.zone_name,
+      eta_min: rec.travel_time_min,
+      distance_km: rec.distance_km,
+      startTime: Date.now(),
+    };
+
+    // Show Active Dispatch Card
+    dispatchTargetName.textContent = `Navigating to ${rec.zone_id} ${rec.zone_name}`;
+    dispatchEtaVal.textContent = `${rec.travel_time_min} mins`;
+    dispatchDistVal.textContent = `${rec.distance_km} km`;
+    dispatchSurgeVal.textContent = `⚡ ${(1.0 + (rec.supply_gap * 0.15)).toFixed(1)}x`;
+    activeDispatchCard.classList.remove('hidden');
+
+    // Draw active navigation route
+    drawRouteLine(state.currentZone, rec.zone_id, true);
+
+    // Focus map on route
+    previewZoneOnMap(rec.zone_id);
+
+    // Start progress simulation
+    simulateDispatchProgress(rec.travel_time_min);
+  } catch (err) {
+    alert(`Could not start reposition dispatch: ${err.message}`);
+  }
+}
+
+function simulateDispatchProgress(totalMins) {
+  if (state.dispatchInterval) clearInterval(state.dispatchInterval);
+  let remainingSecs = totalMins * 60;
+  const progressFill = document.getElementById('dispatch-progress-fill');
+
+  state.dispatchInterval = setInterval(() => {
+    remainingSecs -= 5; // fast forward simulation
+    if (remainingSecs <= 0) {
+      clearInterval(state.dispatchInterval);
+      dispatchEtaVal.textContent = 'Arrived!';
+      progressFill.style.width = '100%';
+    } else {
+      const minsLeft = Math.ceil(remainingSecs / 60);
+      dispatchEtaVal.textContent = `${minsLeft} mins`;
+    }
+  }, 1000);
+}
+
+function cancelDispatch() {
+  if (state.dispatchInterval) clearInterval(state.dispatchInterval);
+  state.activeDispatch = null;
+  activeDispatchCard.classList.add('hidden');
+
+  if (state.routePolyline) {
+    state.map.removeLayer(state.routePolyline);
+    state.routePolyline = null;
+  }
+
+  centerOnDriver();
+}
+
+async function completeDispatch() {
+  if (!state.activeDispatch) return;
+  const targetZone = state.activeDispatch.destination_zone_id;
+  cancelDispatch();
+
+  // Move driver to the new zone
+  currentZoneSelect.value = targetZone;
+  await setDriverCurrentZone(targetZone);
+
+  alert(`You have arrived at ${targetZone}! Your status is Online in the high-demand surge area.`);
+}
+
+// Global hook for popup clicks
+window.dispatchToZone = function (zoneId) {
+  const z = state.zonesCatalog.find((item) => item.zone_id === zoneId);
+  const rec = {
+    zone_id: zoneId,
+    zone_name: z ? z.zone_name : `Zone ${zoneId}`,
+    travel_time_min: 10,
+    distance_km: 5.2,
+    supply_gap: 5,
+  };
+  startDispatch(rec);
 };

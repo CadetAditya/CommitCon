@@ -56,7 +56,7 @@ def get_latest_features(db_path: Path = DB_PATH) -> pd.DataFrame:
 
         df = pd.read_sql(
             """
-            SELECT f.*, z.zone_name 
+            SELECT f.*, z.zone_name, z.center_latitude, z.center_longitude
             FROM feature_dataset f
             JOIN zones z ON f.zone_id = z.zone_id
             WHERE f.timestamp = ?
@@ -281,6 +281,8 @@ def build_recommendation(df: pd.DataFrame, run_id: str | None = None) -> dict:
             "supply_gap": int(row["supply_gap"]),
             "recommended_action": row["recommended_action"],
             "reason_codes": row["reason_codes"],
+            "latitude": float(row["center_latitude"]) if "center_latitude" in row and pd.notnull(row["center_latitude"]) else None,
+            "longitude": float(row["center_longitude"]) if "center_longitude" in row and pd.notnull(row["center_longitude"]) else None,
         }
         sources = row.get("reposition_sources", [])
         if sources:
@@ -367,15 +369,18 @@ def get_driver_personalized_recommendations(
             params=(driver_zone_int,),
         )
         current_zone_info = pd.read_sql(
-            "SELECT zone_name FROM zones WHERE zone_id = ?",
+            "SELECT zone_name, center_latitude, center_longitude FROM zones WHERE zone_id = ?",
             conn,
             params=(driver_zone_int,),
         )
-        current_zone_name = (
-            current_zone_info.iloc[0]["zone_name"]
-            if len(current_zone_info) > 0
-            else f"Zone {driver_zone_int}"
-        )
+        if len(current_zone_info) > 0:
+            current_zone_name = str(current_zone_info.iloc[0]["zone_name"])
+            current_lat = float(current_zone_info.iloc[0]["center_latitude"]) if pd.notnull(current_zone_info.iloc[0]["center_latitude"]) else None
+            current_lon = float(current_zone_info.iloc[0]["center_longitude"]) if pd.notnull(current_zone_info.iloc[0]["center_longitude"]) else None
+        else:
+            current_zone_name = f"Zone {driver_zone_int}"
+            current_lat = None
+            current_lon = None
     finally:
         conn.close()
 
@@ -423,6 +428,8 @@ def get_driver_personalized_recommendations(
         ranked_targets.append({
             "zone_id": zid,
             "zone_name": z["zone_name"],
+            "latitude": z.get("latitude"),
+            "longitude": z.get("longitude"),
             "predicted_requests": reqs,
             "required_drivers": z["required_drivers"],
             "available_drivers": z["available_drivers"],
@@ -442,6 +449,8 @@ def get_driver_personalized_recommendations(
         "driver_current_zone": {
             "zone_id": current_zid,
             "zone_name": current_zone_name,
+            "latitude": current_lat,
+            "longitude": current_lon,
         },
         "total_evaluated": len(ranked_targets),
         "recommendations": ranked_targets[:max_results],

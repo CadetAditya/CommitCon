@@ -192,6 +192,8 @@ class ZoneRecommendation(BaseModel):
     recommended_action: str
     reason_codes: List[str]
     reposition_sources: Optional[List[str]] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class RecommendationResponse(BaseModel):
@@ -376,11 +378,13 @@ def list_zones():
     conn = sqlite3.connect(str(DB_PATH))
     try:
         cursor = conn.cursor()
-        rows = cursor.execute("SELECT zone_id, zone_name FROM zones ORDER BY zone_id").fetchall()
+        rows = cursor.execute("SELECT zone_id, zone_name, center_latitude, center_longitude FROM zones ORDER BY zone_id").fetchall()
         return [
             {
                 "zone_id": f"Z{r[0]:02d}",
                 "zone_name": r[1],
+                "latitude": float(r[2]),
+                "longitude": float(r[3]),
             }
             for r in rows
         ]
