@@ -590,11 +590,11 @@ function switchTab(tab) {
 }
 
 // ============================================================================
-// AI DRIVER COPILOT (CHATBOT)
+// SHERPA AI (DRIVER CHATBOT)
 // ============================================================================
 function initCopilotWelcome() {
   const driverName = state.driver ? state.driver.name.split(' ')[0] : 'Driver';
-  const welcomeText = `Hello ${driverName}! I'm your **Uber Copilot AI** connected to our GPU inference service (\`project-driver:latest\`).
+  const welcomeText = `Hello ${driverName}! I'm **Sherpa**, your AI driver assistant connected to our GPU inference service (\`project-driver:latest\`).
 
 I have live context on your position in **${state.currentZone}** and real-time demand forecasts across all 20 city zones.
 
@@ -620,7 +620,7 @@ function appendCopilotMessage(role, text, save = true) {
   const msgDiv = document.createElement('div');
   msgDiv.className = `chat-msg ${role === 'user' ? 'user' : 'bot'}`;
 
-  const avatar = role === 'user' ? (state.driver ? state.driver.avatar : '👨🏽‍💼') : '🤖';
+  const avatar = role === 'user' ? (state.driver ? state.driver.avatar : '👨🏽‍💼') : '🧭';
   const formattedHtml = formatMarkdown(text);
 
   msgDiv.innerHTML = `
@@ -658,9 +658,9 @@ async function sendCopilotMessage(prompt) {
   const typingDiv = document.createElement('div');
   typingDiv.className = 'chat-msg bot copilot-typing-msg';
   typingDiv.innerHTML = `
-    <div class="chat-msg-avatar">🤖</div>
+    <div class="chat-msg-avatar">🧭</div>
     <div class="copilot-typing">
-      <span>AI Copilot is analyzing fleet data</span>
+      <span>Sherpa is analyzing fleet data</span>
       <div class="typing-dots"><span></span><span></span><span></span></div>
     </div>
   `;
@@ -692,7 +692,7 @@ async function sendCopilotMessage(prompt) {
     typingDiv.remove();
     appendCopilotMessage(
       'assistant',
-      `⚠️ Could not reach AI Copilot (${err.message}). Live model recommendation: check **Z02 Airport** or **Z07 Railway Station** for high demand.`,
+      `⚠️ Could not reach Sherpa (${err.message}). Live model recommendation: check **Z02 Airport** or **Z07 Railway Station** for high demand.`,
       false
     );
   } finally {

@@ -447,10 +447,10 @@ def accept_reposition(req: AcceptRepositionRequest):
 
 @app.post("/api/chat", response_model=DriverChatResponse)
 async def driver_copilot_chat(req: DriverChatRequest):
-    """Driver chatbot assistant: integrates real-time recommendation data
+    """Driver chatbot assistant (Sherpa): integrates real-time recommendation data
     and forwards to the GPU-powered inference API.
     """
-    logger.info("Driver %s asked copilot: %s", req.driver_id, req.driver_prompt[:80])
+    logger.info("Driver %s asked Sherpa: %s", req.driver_id, req.driver_prompt[:80])
 
     # 1. Fetch real-time recommendation data for driver's current zone
     zone_id = req.current_zone_id or "Z06"
