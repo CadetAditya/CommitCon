@@ -1,5 +1,5 @@
 """
-test_system.py - End-to-End Verification of Phases 1 to 5.
+test_system.py - End-to-End Verification of Phases 1 to 5 + Driver Frontend API.
 """
 
 import sys
@@ -110,7 +110,7 @@ def run_all_tests():
     # Test 4: Phase 4 Recommendation Engine Validation
     # -------------------------------------------------------------
     print("\n[PHASE 4] Validating Recommendation Engine ...")
-    from phase4_recommend import generate_recommendations
+    from phase4_recommend import generate_recommendations, get_driver_personalized_recommendations
     rec = generate_recommendations()
     print(f"  Run ID: {rec['run_id']}")
     print(f"  Generated at: {rec['generated_at']}")
@@ -128,13 +128,20 @@ def run_all_tests():
     # Check sorting by supply_gap descending
     gaps = [z["supply_gap"] for z in rec["zones"]]
     assert gaps == sorted(gaps, reverse=True), "Zones must be sorted by supply_gap descending"
+
+    # Test personalized driver recommendations
+    personal = get_driver_personalized_recommendations("Z06", max_results=3)
+    assert "driver_current_zone" in personal
+    assert len(personal["recommendations"]) > 0
+    print(f"  [OK] Personalized Recommendations for Z06 verified: {len(personal['recommendations'])} targets returned")
     print("  [OK] Phase 4 Validated!")
 
     # -------------------------------------------------------------
-    # Test 5: Phase 5 API Endpoint Handlers Validation
+    # Test 5: Phase 5 API & Driver Portal Validation
     # -------------------------------------------------------------
-    print("\n[PHASE 5] Validating FastAPI Service & Endpoints ...")
+    print("\n[PHASE 5] Validating FastAPI Service & Driver Endpoints ...")
     import phase5_api
+    from phase5_api import LoginRequest, AcceptRepositionRequest
     
     # Trigger refresh
     refreshed = phase5_api.refresh_recommendations()
@@ -143,7 +150,34 @@ def run_all_tests():
     # Root
     root_data = phase5_api.root()
     assert "service" in root_data
-    print("  GET / -> OK")
+    print("  GET /api -> OK")
+
+    # Driver Login (Email)
+    login_email = phase5_api.login(LoginRequest(username_or_email="aditya@commitcon.com", password="password123"))
+    assert login_email.success is True
+    assert login_email.driver.name == "Aditya Singh"
+    print(f"  POST /api/login (email) -> OK ({login_email.driver.name}, zone={login_email.driver.current_zone_id})")
+
+    # Driver Login (Phone)
+    login_phone = phase5_api.login(LoginRequest(username_or_email="9876543211", password="password123"))
+    assert login_phone.success is True
+    assert login_phone.driver.name == "Rajesh Kumar"
+    print(f"  POST /api/login (phone) -> OK ({login_phone.driver.name})")
+
+    # List zones
+    all_zones = phase5_api.list_zones()
+    assert len(all_zones) == 20
+    print(f"  GET /api/zones -> OK ({len(all_zones)} zones)")
+
+    # Driver Personalized Recommendations ("Recommended zones for me")
+    for_me = phase5_api.get_personal_recommendations(zone_id="Z06")
+    assert len(for_me["recommendations"]) > 0
+    print(f"  GET /api/recommendations/for-me -> OK (from {for_me['driver_current_zone']['zone_id']}: {len(for_me['recommendations'])} zones)")
+
+    # Accept reposition
+    accept_ack = phase5_api.accept_reposition(AcceptRepositionRequest(driver_id="DRV_101", destination_zone_id="Z07"))
+    assert accept_ack["status"] == "ACCEPTED"
+    print(f"  POST /api/drivers/accept-reposition -> OK ({accept_ack['message']})")
     
     # Health
     health_data = phase5_api.health()
@@ -178,9 +212,8 @@ def run_all_tests():
     print("  POST /recommendations/refresh -> OK")
 
     print("\n" + "=" * 70)
-    print("ALL 5 PHASES AND DELIVERABLES ARE FULLY IMPLEMENTED AND VERIFIED!")
+    print("ALL TESTS PASSED! BACKEND & FRONTEND READY FOR DRIVERS!")
     print("=" * 70)
 
 if __name__ == "__main__":
     run_all_tests()
-

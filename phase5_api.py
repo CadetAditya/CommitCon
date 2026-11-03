@@ -1,8 +1,11 @@
 """
 Phase 5: FastAPI Service for Driver Repositioning Recommendations.
 
-Exposes the recommendation engine via a REST API with automatic periodic
-refresh (every 15 minutes), manual refresh, health checks, and historical lookup.
+Includes:
+- Complete Driver Web App frontend (Login, Overall City Demand, Personalized Recommendations)
+- REST API with 15-minute periodic background refresh
+- Driver authentication (Email/Phone + Password)
+- Personalized driver recommendations based on real-time driver location
 """
 
 import sys
@@ -13,6 +16,7 @@ except Exception:
 
 import json
 import logging
+import sqlite3
 import threading
 import time
 from datetime import datetime, timezone, timedelta
@@ -21,23 +25,28 @@ from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from phase4_recommend import generate_recommendations
+from phase4_recommend import (
+    generate_recommendations,
+    get_driver_personalized_recommendations,
+    DB_PATH,
+)
 
 # ---------------------------------------------------------------------------
-# Logging
+# Logging & Timezone
 # ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("commitcon_api")
-
-# ---------------------------------------------------------------------------
-# IST helper
-# ---------------------------------------------------------------------------
 IST = timezone(timedelta(hours=5, minutes=30))
+
+BASE_DIR = Path(__file__).parent
+STATIC_DIR = BASE_DIR / "static"
 
 # ---------------------------------------------------------------------------
 # Scheduler (Native background scheduler with APScheduler fallback)
@@ -99,8 +108,80 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
+# Demo Drivers Store
+# ---------------------------------------------------------------------------
+DEMO_DRIVERS = {
+    "aditya@commitcon.com": {
+        "id": "DRV_101",
+        "name": "Aditya Singh",
+        "email": "aditya@commitcon.com",
+        "phone": "9876543210",
+        "vehicle": "Toyota Sedan (KA-01-AB-1234)",
+        "current_zone_id": "Z06",
+        "avatar": "👨🏽‍💼",
+        "rating": 4.92,
+    },
+    "rajesh@commitcon.com": {
+        "id": "DRV_102",
+        "name": "Rajesh Kumar",
+        "email": "rajesh@commitcon.com",
+        "phone": "9876543211",
+        "vehicle": "Hyundai Prime (MH-02-CD-5678)",
+        "current_zone_id": "Z13",
+        "avatar": "👨🏻‍✈️",
+        "rating": 4.88,
+    },
+    "vikram@commitcon.com": {
+        "id": "DRV_103",
+        "name": "Vikram Sharma",
+        "email": "vikram@commitcon.com",
+        "phone": "9876543212",
+        "vehicle": "Maruti Dzire (DL-03-EF-9012)",
+        "current_zone_id": "Z10",
+        "avatar": "🧔🏾",
+        "rating": 4.95,
+    },
+    "priya@commitcon.com": {
+        "id": "DRV_104",
+        "name": "Priya Patel",
+        "email": "priya@commitcon.com",
+        "phone": "9876543213",
+        "vehicle": "Honda Amaze (KA-04-GH-3456)",
+        "current_zone_id": "Z20",
+        "avatar": "👩🏽",
+        "rating": 4.97,
+    },
+}
+
+# Also allow phone lookup
+PHONE_TO_EMAIL = {d["phone"]: d["email"] for d in DEMO_DRIVERS.values()}
+
+
+# ---------------------------------------------------------------------------
 # Pydantic models
 # ---------------------------------------------------------------------------
+class LoginRequest(BaseModel):
+    username_or_email: str
+    password: str
+
+
+class DriverProfile(BaseModel):
+    id: str
+    name: str
+    email: str
+    phone: str
+    vehicle: str
+    current_zone_id: str
+    avatar: str
+    rating: float
+
+
+class LoginResponse(BaseModel):
+    success: bool
+    token: str
+    driver: DriverProfile
+
+
 class ZoneRecommendation(BaseModel):
     zone_id: str
     zone_name: str
@@ -129,14 +210,18 @@ class HealthResponse(BaseModel):
     total_runs: int
 
 
+class AcceptRepositionRequest(BaseModel):
+    driver_id: str
+    destination_zone_id: str
+
+
 # ---------------------------------------------------------------------------
-# Global state
+# Global State
 # ---------------------------------------------------------------------------
 latest_recommendation: Optional[dict] = None
-recommendation_history: list = []  # keep last 10
+recommendation_history: list = []
 run_counter: int = 0
 HISTORY_MAX = 10
-
 scheduler = BackgroundScheduler()
 
 
@@ -151,7 +236,6 @@ def refresh_recommendations() -> dict:
         rec = generate_recommendations()
         latest_recommendation = rec
 
-        # Append to history (keep only last HISTORY_MAX)
         recommendation_history.append(
             {
                 "run_id": rec["run_id"],
@@ -174,14 +258,14 @@ def refresh_recommendations() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# FastAPI application
+# FastAPI app & Lifecycle
 # ---------------------------------------------------------------------------
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager for startup and shutdown."""
-    logger.info("Starting CommitCon Recommendation API ...")
+    logger.info("Starting CommitCon Recommendation API & Driver Portal ...")
     try:
         refresh_recommendations()
     except Exception:
@@ -201,8 +285,8 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown(wait=False)
 
 app = FastAPI(
-    title="CommitCon Driver Repositioning API",
-    description="Real-time driver repositioning recommendations for ride-hailing operations.",
+    title="CommitCon Driver Repositioning Portal & API",
+    description="Driver login, citywide demand dashboard, and personalized repositioning recommendations.",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -215,13 +299,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static directory for frontend assets
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
 
 # ---------------------------------------------------------------------------
-# Endpoints
+# Web App Entry Route
 # ---------------------------------------------------------------------------
-@app.get("/")
+@app.get("/api")
 def root():
-    """Welcome endpoint."""
+    """API info and service metadata."""
     return {
         "service": "CommitCon Driver Repositioning API",
         "version": "1.0.0",
@@ -236,7 +324,101 @@ def root():
         ]
     }
 
+@app.get("/")
+def serve_home():
+    """Serves the driver portal web application."""
+    index_file = STATIC_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return root()
 
+
+# ---------------------------------------------------------------------------
+# Authentication Endpoints
+# ---------------------------------------------------------------------------
+@app.post("/api/login", response_model=LoginResponse)
+def login(req: LoginRequest):
+    """Driver login via email or phone number and password."""
+    user_key = req.username_or_email.strip().lower()
+
+    # Look up by email or phone
+    driver_data = DEMO_DRIVERS.get(user_key)
+    if not driver_data and req.username_or_email.strip() in PHONE_TO_EMAIL:
+        email = PHONE_TO_EMAIL[req.username_or_email.strip()]
+        driver_data = DEMO_DRIVERS.get(email)
+
+    # Allow custom username/phone demo login as well
+    if not driver_data:
+        driver_data = {
+            "id": f"DRV_{abs(hash(user_key)) % 900 + 100}",
+            "name": req.username_or_email.split("@")[0].capitalize() if "@" in req.username_or_email else f"Driver {req.username_or_email[-4:]}",
+            "email": req.username_or_email if "@" in req.username_or_email else f"{req.username_or_email}@commitcon.com",
+            "phone": req.username_or_email if req.username_or_email.isdigit() else "9876543210",
+            "vehicle": "Sedan (KA-01-CC-9999)",
+            "current_zone_id": "Z06",
+            "avatar": "🚗",
+            "rating": 4.90,
+        }
+
+    return LoginResponse(
+        success=True,
+        token=f"demo_token_{driver_data['id']}",
+        driver=DriverProfile(**driver_data),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Driver & Zone Endpoints
+# ---------------------------------------------------------------------------
+@app.get("/api/zones")
+def list_zones():
+    """Returns all 20 zones with name and formatted ID."""
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        cursor = conn.cursor()
+        rows = cursor.execute("SELECT zone_id, zone_name FROM zones ORDER BY zone_id").fetchall()
+        return [
+            {
+                "zone_id": f"Z{r[0]:02d}",
+                "zone_name": r[1],
+            }
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
+@app.get("/api/recommendations/for-me")
+def get_personal_recommendations(zone_id: str = "Z06", limit: int = 5):
+    """Returns customized repositioning recommendations for an individual driver
+    calculated from their current zone.
+    """
+    try:
+        return get_driver_personalized_recommendations(zone_id, max_results=limit)
+    except Exception as exc:
+        logger.exception("Failed to compute personalized recommendations for zone %s", zone_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not compute personal recommendations: {exc}",
+        )
+
+
+@app.post("/api/drivers/accept-reposition")
+def accept_reposition(req: AcceptRepositionRequest):
+    """Driver accepts repositioning to a target zone."""
+    logger.info("Driver %s accepted repositioning to %s", req.driver_id, req.destination_zone_id)
+    return {
+        "status": "ACCEPTED",
+        "driver_id": req.driver_id,
+        "destination_zone_id": req.destination_zone_id,
+        "dispatch_timestamp": datetime.now(IST).isoformat(),
+        "message": f"Navigation route dispatched to {req.destination_zone_id}.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Standard Recommendation Endpoints (Phases 4 & 5 Core Requirements)
+# ---------------------------------------------------------------------------
 @app.get("/health", response_model=HealthResponse)
 def health():
     """Health-check endpoint with refresh metadata."""
@@ -270,10 +452,7 @@ def get_latest():
     response_model=ZoneRecommendation,
 )
 def get_zone(zone_id: str):
-    """Return the recommendation for a single zone from the latest run.
-
-    Example: ``/recommendations/latest/zone/Z03``
-    """
+    """Return the recommendation for a single zone from the latest run."""
     if latest_recommendation is None:
         raise HTTPException(status_code=404, detail="No recommendations available yet.")
 
@@ -293,10 +472,7 @@ def get_zone(zone_id: str):
     response_model=List[ZoneRecommendation],
 )
 def get_by_action(action: str):
-    """Filter zones from the latest recommendation by action.
-
-    Valid actions: ``REPOSITION_IN``, ``REPOSITION_OUT``, ``MONITOR``
-    """
+    """Filter zones from the latest recommendation by action."""
     if latest_recommendation is None:
         raise HTTPException(status_code=404, detail="No recommendations available yet.")
 

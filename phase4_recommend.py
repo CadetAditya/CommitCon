@@ -335,6 +335,121 @@ def generate_recommendations(run_id: str | None = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 8. Personalized driver recommendations
+# ---------------------------------------------------------------------------
+def get_driver_personalized_recommendations(
+    driver_zone_id: str | int,
+    db_path: Path = DB_PATH,
+    max_results: int = 5,
+) -> dict:
+    """Compute personalized zone recommendations for an individual driver
+    based on their current zone, travel time, and citywide demand/supply gaps.
+    """
+    if isinstance(driver_zone_id, str):
+        driver_zone_int = int(driver_zone_id.replace("Z", "").strip())
+    else:
+        driver_zone_int = int(driver_zone_id)
+
+    # 1. Fetch latest overall recommendations
+    city_rec = generate_recommendations()
+    zones_map = {z["zone_id"]: z for z in city_rec["zones"]}
+
+    # 2. Query travel times from driver's current zone to all other zones
+    conn = sqlite3.connect(str(db_path))
+    try:
+        travel_df = pd.read_sql(
+            """
+            SELECT destination_zone_id, estimated_travel_time_min, distance_km 
+            FROM zone_travel_times 
+            WHERE source_zone_id = ?
+            """,
+            conn,
+            params=(driver_zone_int,),
+        )
+        current_zone_info = pd.read_sql(
+            "SELECT zone_name FROM zones WHERE zone_id = ?",
+            conn,
+            params=(driver_zone_int,),
+        )
+        current_zone_name = (
+            current_zone_info.iloc[0]["zone_name"]
+            if len(current_zone_info) > 0
+            else f"Zone {driver_zone_int}"
+        )
+    finally:
+        conn.close()
+
+    travel_map = {
+        _format_zone_id(row["destination_zone_id"]): {
+            "travel_time_min": float(row["estimated_travel_time_min"]),
+            "distance_km": float(row["distance_km"]),
+        }
+        for _, row in travel_df.iterrows()
+    }
+
+    current_zid = _format_zone_id(driver_zone_int)
+
+    # 3. Score target zones
+    ranked_targets = []
+    for zid, z in zones_map.items():
+        if zid == current_zid:
+            continue
+
+        tt_info = travel_map.get(zid, {"travel_time_min": 99.0, "distance_km": 99.0})
+        tt = tt_info["travel_time_min"]
+        dist = tt_info["distance_km"]
+
+        gap = z["supply_gap"]
+        reqs = z["predicted_requests"]
+
+        # Score formula: reward high gap and high demand, penalize longer travel time
+        score = (gap * 3.5) + (reqs * 1.5) - (tt * 0.4)
+
+        if gap >= 3 and tt <= 25:
+            badge = "High Demand Surge"
+        elif tt <= 15:
+            badge = "Quick Reposition"
+        elif gap > 0:
+            badge = "Driver Shortage"
+        else:
+            badge = "High Activity"
+
+        driver_reasons = list(z["reason_codes"])
+        if tt <= 15:
+            driver_reasons.insert(0, "FAST_TRAVEL_TIME")
+        if gap >= 3:
+            driver_reasons.insert(0, "CRITICAL_DRIVER_SHORTAGE")
+
+        ranked_targets.append({
+            "zone_id": zid,
+            "zone_name": z["zone_name"],
+            "predicted_requests": reqs,
+            "required_drivers": z["required_drivers"],
+            "available_drivers": z["available_drivers"],
+            "supply_gap": gap,
+            "travel_time_min": round(tt, 1),
+            "distance_km": round(dist, 1),
+            "opportunity_score": round(score, 1),
+            "badge": badge,
+            "reason_codes": driver_reasons,
+            "recommended_action": z["recommended_action"],
+        })
+
+    # Sort by opportunity score descending
+    ranked_targets.sort(key=lambda x: x["opportunity_score"], reverse=True)
+
+    return {
+        "driver_current_zone": {
+            "zone_id": current_zid,
+            "zone_name": current_zone_name,
+        },
+        "total_evaluated": len(ranked_targets),
+        "recommendations": ranked_targets[:max_results],
+    }
+
+
+
+# ---------------------------------------------------------------------------
 # CLI entry-point
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
