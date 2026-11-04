@@ -1600,6 +1600,38 @@ body.uber-theme {
   gap: 8px;
 }
 
+/* Voice TTS Toggle Pill */
+.copilot-tts-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(39, 110, 241, 0.15);
+  border: 1px solid rgba(39, 110, 241, 0.4);
+  color: #93C5FD;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copilot-tts-pill.active {
+  background: rgba(6, 193, 103, 0.18);
+  border-color: #06C167;
+  color: #34D399;
+}
+
+.copilot-tts-pill.muted {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--uber-gray-400);
+}
+
+.copilot-tts-pill:hover {
+  transform: translateY(-1px);
+}
+
 .panel-close-btn {
   background: rgba(255, 255, 255, 0.08);
   border: none;
@@ -1751,6 +1783,43 @@ body.uber-theme {
   display: block;
 }
 
+.chat-bubble-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  gap: 8px;
+}
+
+.msg-speak-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--uber-gray-200);
+  color: var(--uber-gray-600);
+  font-family: var(--font-primary);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.msg-speak-btn:hover {
+  background: var(--uber-white);
+  color: var(--uber-black);
+  border-color: var(--uber-gray-400);
+}
+
+.msg-speak-btn.speaking {
+  background: #DCFCE7;
+  color: #15803D;
+  border-color: #86EFAC;
+  animation: pulse 1.5s infinite;
+}
+
 .chat-msg.user .chat-time {
   text-align: right;
   color: rgba(255, 255, 255, 0.6);
@@ -1795,13 +1864,72 @@ body.uber-theme {
   border-top: 1px solid var(--uber-gray-200);
 }
 
+/* Voice Listening Status Strip */
+.copilot-voice-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  animation: fadeIn 0.2s ease;
+}
+
+.voice-wave-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 14px;
+}
+
+.wave-bar {
+  width: 3px;
+  height: 5px;
+  background: #EF4444;
+  border-radius: 2px;
+  animation: wave-bounce 0.9s infinite ease-in-out;
+}
+
+.wave-bar:nth-child(2) { animation-delay: 0.15s; }
+.wave-bar:nth-child(3) { animation-delay: 0.3s; }
+.wave-bar:nth-child(4) { animation-delay: 0.45s; }
+
+@keyframes wave-bounce {
+  0%, 100% { height: 4px; }
+  50% { height: 14px; }
+}
+
+.voice-status-label {
+  flex: 1;
+}
+
+.voice-stop-btn {
+  background: transparent;
+  border: none;
+  color: #991B1B;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.voice-stop-btn:hover {
+  background: #FEE2E2;
+}
+
 .copilot-input-wrapper {
   display: flex;
   align-items: center;
   background: var(--uber-gray-100);
   border: 1.5px solid transparent;
   border-radius: var(--radius-pill);
-  padding: 0 6px 0 14px;
+  padding: 0 6px 0 6px;
   height: 42px;
   transition: all 0.2s ease;
 }
@@ -1809,6 +1937,41 @@ body.uber-theme {
 .copilot-input-wrapper:focus-within {
   background: var(--uber-white);
   border-color: var(--uber-black);
+}
+
+/* Microphone Button (Speech-to-Text) */
+.copilot-mic-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--uber-gray-600);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 4px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.copilot-mic-btn:hover {
+  background: var(--uber-gray-200);
+  color: var(--uber-black);
+}
+
+.copilot-mic-btn.listening {
+  background: #EF4444 !important;
+  color: #FFFFFF !important;
+  animation: mic-listening-pulse 1.2s infinite;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+}
+
+@keyframes mic-listening-pulse {
+  0% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  50% { transform: scale(1.08); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
 .copilot-input-wrapper input {

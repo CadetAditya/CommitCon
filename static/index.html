@@ -327,6 +327,10 @@
               </div>
             </div>
             <div class="copilot-banner-actions">
+              <button type="button" id="tts-toggle-btn" class="copilot-tts-pill active" title="Voice Responses: Enabled (Click to Mute)">
+                <span id="tts-icon">🔊</span>
+                <span id="tts-label">Voice ON</span>
+              </button>
               <button id="clear-chat-btn" class="copilot-clear-btn" title="Clear chat history">🗑️</button>
               <button id="close-copilot-btn" class="panel-close-btn" title="Back to recommendations">✕</button>
             </div>
@@ -349,10 +353,31 @@
             <!-- Messages populated dynamically -->
           </div>
 
-          <!-- CHAT INPUT BAR -->
+          <!-- CHAT INPUT BAR (Voice Input & Text) -->
           <form id="copilot-form" class="copilot-input-area">
+            <!-- Voice listening indicator strip -->
+            <div id="copilot-voice-status" class="copilot-voice-status hidden">
+              <div class="voice-wave-container">
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+                <span class="wave-bar"></span>
+              </div>
+              <span id="voice-status-label" class="voice-status-label">Listening... Speak now</span>
+              <button type="button" id="copilot-voice-stop-btn" class="voice-stop-btn" title="Cancel voice input">✕</button>
+            </div>
+
             <div class="copilot-input-wrapper">
-              <input type="text" id="copilot-input" placeholder="Ask Sherpa about demand, traffic, or zones..." autocomplete="off" required>
+              <!-- Microphone Button (Speech-to-Text) -->
+              <button type="button" id="copilot-mic-btn" class="copilot-mic-btn" title="Speak to Sherpa (Voice Input)">
+                <svg class="mic-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+              </button>
+              <input type="text" id="copilot-input" placeholder="Type or tap mic to speak to Sherpa..." autocomplete="off">
               <button type="submit" id="copilot-send-btn" class="copilot-send-btn" title="Send message">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -361,7 +386,7 @@
               </button>
             </div>
             <div class="copilot-disclaimer">
-              Powered by real-time ML forecast data from your active zone.
+              <span>🎙️ Hands-free driving • Speak into mic or type • Auto voice responses</span>
             </div>
           </form>
         </div>

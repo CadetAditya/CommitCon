@@ -26,6 +26,9 @@ const state = {
   chatHistory: [],
   earningsAnalysis: null,
   currentTab: 'personal',
+  ttsEnabled: localStorage.getItem('sherpa_tts_enabled') !== 'false',
+  isRecordingVoice: false,
+  recognition: null,
 };
 
 // DOM Elements
@@ -92,6 +95,13 @@ const copilotForm = document.getElementById('copilot-form');
 const copilotInput = document.getElementById('copilot-input');
 const copilotSendBtn = document.getElementById('copilot-send-btn');
 const clearChatBtn = document.getElementById('clear-chat-btn');
+const ttsToggleBtn = document.getElementById('tts-toggle-btn');
+const ttsIcon = document.getElementById('tts-icon');
+const ttsLabel = document.getElementById('tts-label');
+const copilotMicBtn = document.getElementById('copilot-mic-btn');
+const copilotVoiceStatus = document.getElementById('copilot-voice-status');
+const copilotVoiceStopBtn = document.getElementById('copilot-voice-stop-btn');
+const voiceStatusLabel = document.getElementById('voice-status-label');
 
 // City Demand
 const allZonesList = document.getElementById('all-zones-list');
@@ -205,6 +215,28 @@ function setupEventListeners() {
   });
 
   clearChatBtn.addEventListener('click', clearCopilotChat);
+
+  // Text-to-Speech (TTS) Toggle
+  if (ttsToggleBtn) {
+    updateTTSButtonUI();
+    ttsToggleBtn.addEventListener('click', () => {
+      state.ttsEnabled = !state.ttsEnabled;
+      localStorage.setItem('sherpa_tts_enabled', state.ttsEnabled);
+      if (!state.ttsEnabled) {
+        stopSpeaking();
+      }
+      updateTTSButtonUI();
+    });
+  }
+
+  // Speech-to-Text (Microphone) listeners
+  if (copilotMicBtn) {
+    copilotMicBtn.addEventListener('click', toggleVoiceRecording);
+  }
+
+  if (copilotVoiceStopBtn) {
+    copilotVoiceStopBtn.addEventListener('click', stopVoiceRecording);
+  }
 
   document.querySelectorAll('.copilot-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
@@ -811,13 +843,41 @@ function appendCopilotMessage(role, text, save = true) {
   const avatar = role === 'user' ? (state.driver ? state.driver.avatar : '👨🏽‍💼') : '🧭';
   const formattedHtml = formatMarkdown(text);
 
-  msgDiv.innerHTML = `
-    <div class="chat-msg-avatar">${avatar}</div>
-    <div class="chat-bubble">
-      ${formattedHtml}
-      <span class="chat-time">${timeStr}</span>
-    </div>
-  `;
+  if (role === 'assistant') {
+    msgDiv.innerHTML = `
+      <div class="chat-msg-avatar">${avatar}</div>
+      <div class="chat-bubble">
+        ${formattedHtml}
+        <div class="chat-bubble-footer">
+          <span class="chat-time">${timeStr}</span>
+          <button type="button" class="msg-speak-btn" title="Listen to this message">
+            <span class="speak-icon">🔊</span>
+            <span>Listen</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    const speakBtn = msgDiv.querySelector('.msg-speak-btn');
+    if (speakBtn) {
+      speakBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (speakBtn.classList.contains('speaking')) {
+          stopSpeaking();
+        } else {
+          speakText(text, speakBtn);
+        }
+      });
+    }
+  } else {
+    msgDiv.innerHTML = `
+      <div class="chat-msg-avatar">${avatar}</div>
+      <div class="chat-bubble">
+        ${formattedHtml}
+        <span class="chat-time">${timeStr}</span>
+      </div>
+    `;
+  }
 
   copilotMessages.appendChild(msgDiv);
   scrollChatToBottom();
@@ -876,19 +936,26 @@ async function sendCopilotMessage(prompt) {
     const data = await res.json();
     typingDiv.remove();
     appendCopilotMessage('assistant', data.answer, true);
+
+    // Text-to-Speech: Auto voice response if enabled
+    if (state.ttsEnabled) {
+      speakText(data.answer);
+    }
   } catch (err) {
     typingDiv.remove();
-    appendCopilotMessage(
-      'assistant',
-      `⚠️ Could not reach Sherpa (${err.message}). Live model recommendation: check **Z02 Airport** or **Z07 Railway Station** for high demand.`,
-      false
-    );
+    const errMsg = `⚠️ Could not reach Sherpa (${err.message}). Live model recommendation: check **Z02 Airport** or **Z07 Railway Station** for high demand.`;
+    appendCopilotMessage('assistant', errMsg, false);
+    if (state.ttsEnabled) {
+      speakText(errMsg);
+    }
   } finally {
     copilotSendBtn.disabled = false;
   }
 }
 
 function clearCopilotChat() {
+  stopSpeaking();
+  stopVoiceRecording();
   state.chatHistory = [];
   try {
     const storageKey = 'copilot_history_' + (state.driver ? state.driver.id : 'demo');
@@ -900,6 +967,185 @@ function clearCopilotChat() {
 
 function scrollChatToBottom() {
   copilotMessages.scrollTop = copilotMessages.scrollHeight;
+}
+
+// ============================================================================
+// VOICE INPUT (SPEECH-TO-TEXT) & AUDIO OUTPUT (TEXT-TO-SPEECH)
+// ============================================================================
+
+function updateTTSButtonUI() {
+  if (!ttsToggleBtn) return;
+  if (state.ttsEnabled) {
+    ttsToggleBtn.classList.add('active');
+    ttsToggleBtn.classList.remove('muted');
+    ttsToggleBtn.setAttribute('title', 'Voice Responses: Enabled (Click to Mute)');
+    if (ttsIcon) ttsIcon.textContent = '🔊';
+    if (ttsLabel) ttsLabel.textContent = 'Voice ON';
+  } else {
+    ttsToggleBtn.classList.remove('active');
+    ttsToggleBtn.classList.add('muted');
+    ttsToggleBtn.setAttribute('title', 'Voice Responses: Muted (Click to Unmute)');
+    if (ttsIcon) ttsIcon.textContent = '🔇';
+    if (ttsLabel) ttsLabel.textContent = 'Voice OFF';
+  }
+}
+
+function cleanTextForSpeech(raw) {
+  if (!raw) return '';
+  return raw
+    .replace(/[*_#`~>]/g, '')                // Strip markdown formatting symbols
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // Strip markdown links
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')   // Strip emojis
+    .replace(/\s+/g, ' ')                    // Collapse spaces
+    .trim();
+}
+
+function speakText(rawText, targetBtn = null) {
+  if (!('speechSynthesis' in window)) return;
+
+  // Stop any active speech before starting new speech
+  stopSpeaking();
+
+  const spokenText = cleanTextForSpeech(rawText);
+  if (!spokenText) return;
+
+  const utterance = new SpeechSynthesisUtterance(spokenText);
+  utterance.lang = 'en-IN';
+  utterance.rate = 1.05;
+  utterance.pitch = 1.0;
+
+  // Choose a clean English voice if available
+  const voices = window.speechSynthesis.getVoices();
+  const naturalVoice = voices.find(v => (v.lang === 'en-IN' || v.lang === 'en-GB' || v.lang === 'en-US') && !v.name.includes('whisper'));
+  if (naturalVoice) {
+    utterance.voice = naturalVoice;
+  }
+
+  if (targetBtn) {
+    targetBtn.classList.add('speaking');
+    targetBtn.innerHTML = '<span class="speak-icon">🔊</span><span>Playing...</span>';
+  }
+
+  utterance.onend = () => {
+    if (targetBtn) {
+      targetBtn.classList.remove('speaking');
+      targetBtn.innerHTML = '<span class="speak-icon">🔊</span><span>Listen</span>';
+    }
+  };
+
+  utterance.onerror = () => {
+    if (targetBtn) {
+      targetBtn.classList.remove('speaking');
+      targetBtn.innerHTML = '<span class="speak-icon">🔊</span><span>Listen</span>';
+    }
+  };
+
+  window.speechSynthesis.speak(utterance);
+}
+
+function stopSpeaking() {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  document.querySelectorAll('.msg-speak-btn.speaking').forEach(btn => {
+    btn.classList.remove('speaking');
+    btn.innerHTML = '<span class="speak-icon">🔊</span><span>Listen</span>';
+  });
+}
+
+function toggleVoiceRecording() {
+  if (state.isRecordingVoice) {
+    stopVoiceRecording();
+  } else {
+    startVoiceRecording();
+  }
+}
+
+function startVoiceRecording() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('Voice recognition is not supported in this browser. Please type into the chat.');
+    return;
+  }
+
+  // Stop any ongoing voice output when driver is about to speak
+  stopSpeaking();
+
+  try {
+    state.recognition = new SpeechRecognition();
+    state.recognition.lang = 'en-IN';
+    state.recognition.continuous = false;
+    state.recognition.interimResults = true;
+
+    let finalTranscript = '';
+
+    state.recognition.onstart = () => {
+      state.isRecordingVoice = true;
+      if (copilotMicBtn) {
+        copilotMicBtn.classList.add('listening');
+        copilotMicBtn.setAttribute('title', 'Listening... Tap to stop');
+      }
+      if (copilotVoiceStatus) copilotVoiceStatus.classList.remove('hidden');
+      if (voiceStatusLabel) voiceStatusLabel.textContent = 'Listening to your voice... Speak now';
+    };
+
+    state.recognition.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      const currentText = (finalTranscript || interim).trim();
+      copilotInput.value = currentText;
+      if (voiceStatusLabel) {
+        voiceStatusLabel.textContent = currentText ? `"${currentText}"` : 'Listening... Speak now';
+      }
+    };
+
+    state.recognition.onerror = (event) => {
+      console.warn('Speech recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        alert('Microphone access was denied. Please allow microphone permissions in your browser address bar.');
+      }
+      stopVoiceRecording();
+    };
+
+    state.recognition.onend = () => {
+      const recognized = copilotInput.value.trim();
+      stopVoiceRecording();
+
+      // Automatically send the driver's spoken prompt to Sherpa!
+      if (recognized) {
+        sendCopilotMessage(recognized);
+        copilotInput.value = '';
+      }
+    };
+
+    state.recognition.start();
+  } catch (err) {
+    console.error('Failed to start speech recognition:', err);
+    stopVoiceRecording();
+  }
+}
+
+function stopVoiceRecording() {
+  state.isRecordingVoice = false;
+  if (copilotMicBtn) {
+    copilotMicBtn.classList.remove('listening');
+    copilotMicBtn.setAttribute('title', 'Speak to Sherpa (Voice Input)');
+  }
+  if (copilotVoiceStatus) {
+    copilotVoiceStatus.classList.add('hidden');
+  }
+  if (state.recognition) {
+    try {
+      state.recognition.stop();
+    } catch {}
+    state.recognition = null;
+  }
 }
 
 function formatReason(code) {

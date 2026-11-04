@@ -19,3 +19,4 @@ if __name__ == "__main__":
     
     import uvicorn
     uvicorn.run("phase5_api:app", host=host, port=port, log_level="info")
+
