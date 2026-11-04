@@ -23,10 +23,5 @@ ENV PYTHONUNBUFFERED=1 \
 
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
-
-# Launch uvicorn supporting dynamic cloud $PORT
-CMD ["sh", "-c", "uvicorn phase5_api:app --host 0.0.0.0 --port ${PORT:-8000}"]
-
+# Launch application via universal runner
+CMD ["python", "run.py"]

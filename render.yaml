@@ -3,7 +3,7 @@ services:
     name: commitcon-driver-portal
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn phase5_api:app --host 0.0.0.0 --port $PORT
+    startCommand: python run.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -12,4 +12,3 @@ services:
       - key: AI_INFERENCE_KEY
         value: commitcon-secret-2026
     plan: free
-
