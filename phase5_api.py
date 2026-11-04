@@ -31,6 +31,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from earnings_analysis import compute_historical_earnings_analysis
 from phase4_recommend import (
     generate_recommendations,
     get_driver_personalized_recommendations,
@@ -443,6 +444,23 @@ def accept_reposition(req: AcceptRepositionRequest):
         "dispatch_timestamp": datetime.now(IST).isoformat(),
         "message": f"Navigation route dispatched to {req.destination_zone_id}.",
     }
+
+
+_CACHED_EARNINGS_ANALYSIS = None
+
+@app.get("/api/analysis/earnings")
+def get_earnings_analysis(driver_id: Optional[str] = None):
+    """Returns counterfactual earnings analysis comparing driver income
+    with vs without the CommitCon recommendation model over past 30 days.
+    """
+    global _CACHED_EARNINGS_ANALYSIS
+    if _CACHED_EARNINGS_ANALYSIS is None:
+        _CACHED_EARNINGS_ANALYSIS = compute_historical_earnings_analysis()
+
+    data = dict(_CACHED_EARNINGS_ANALYSIS)
+    if driver_id and driver_id in data.get("driver_profiles", {}):
+        data["active_driver"] = data["driver_profiles"][driver_id]
+    return data
 
 
 @app.post("/api/chat", response_model=DriverChatResponse)

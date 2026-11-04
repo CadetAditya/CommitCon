@@ -29,3 +29,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 # Launch uvicorn supporting dynamic cloud $PORT
 CMD ["sh", "-c", "uvicorn phase5_api:app --host 0.0.0.0 --port ${PORT:-8000}"]
+

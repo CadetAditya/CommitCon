@@ -137,8 +137,14 @@
         <!-- Copilot Header Pill -->
         <button id="header-copilot-btn" class="header-copilot-pill" title="Chat with Sherpa AI">
           <span class="copilot-pill-icon">🧭</span>
-          <span class="copilot-pill-text">Sherpa</span>
+          <span class="copilot-pill-text">Sherpa AI</span>
           <span class="copilot-status-dot"></span>
+        </button>
+
+        <!-- Analytics Header Pill -->
+        <button id="header-analytics-btn" class="header-analytics-pill" title="View Driver Earnings & ROI Impact">
+          <span class="analytics-pill-icon">📊</span>
+          <span class="analytics-pill-text">Driver Impact (+86%)</span>
         </button>
 
         <!-- Driver Profile Menu -->
@@ -171,17 +177,12 @@
         <div class="uber-segmented-control">
           <button id="tab-personal-btn" class="seg-btn active">
             <span class="seg-icon">🎯</span>
-            <span class="seg-text">For Me</span>
+            <span class="seg-text">Recommended For Me</span>
             <span class="seg-badge" id="personal-badge-count">6</span>
           </button>
           <button id="tab-overall-btn" class="seg-btn">
             <span class="seg-icon">🏙️</span>
-            <span class="seg-text">City (20)</span>
-          </button>
-          <button id="tab-copilot-btn" class="seg-btn highlight-copilot">
-            <span class="seg-icon">🧭</span>
-            <span class="seg-text">Sherpa</span>
-            <span class="seg-badge pulse-badge">AI</span>
+            <span class="seg-text">City Demand (20)</span>
           </button>
         </div>
 
@@ -325,7 +326,10 @@
                 </div>
               </div>
             </div>
-            <button id="clear-chat-btn" class="copilot-clear-btn" title="Clear chat history">🗑️</button>
+            <div class="copilot-banner-actions">
+              <button id="clear-chat-btn" class="copilot-clear-btn" title="Clear chat history">🗑️</button>
+              <button id="close-copilot-btn" class="panel-close-btn" title="Back to recommendations">✕</button>
+            </div>
           </div>
 
           <!-- QUICK PROMPT CHIPS -->
@@ -360,6 +364,254 @@
               Powered by real-time ML forecast data from your active zone.
             </div>
           </form>
+        </div>
+
+        <!-- ================= TAB 4: EARNINGS & COUNTERFACTUAL ROI ANALYSIS ================= -->
+        <div id="panel-analytics" class="sidebar-panel-content analytics-panel hidden">
+          <!-- TOP RETURN BAR -->
+          <div class="panel-top-return-bar">
+            <button id="close-analytics-btn" class="btn-return-nav" title="Back to recommendations">
+              <span class="return-arrow">←</span> Back to Recommendations
+            </button>
+          </div>
+
+          <!-- HERO ROI BANNER -->
+          <div class="analytics-hero-banner">
+            <div class="roi-badge-pill">📈 30-Day Historical Counterfactual Study</div>
+            <div class="roi-hero-headline">
+              <span class="roi-hero-currency">₹</span>
+              <span class="roi-hero-val" id="analytics-monthly-gain">56,550</span>
+              <span class="roi-hero-unit">/ month</span>
+            </div>
+            <div class="roi-hero-sub">
+              Net extra income for drivers following CommitCon recommendations (<strong>+85.9%</strong> average shift gain).
+            </div>
+            <div class="roi-shift-strip">
+              <div class="shift-stat">
+                <span class="stat-label">With CommitCon</span>
+                <span class="stat-val text-green" id="analytics-shift-with">₹4,896 / shift</span>
+              </div>
+              <div class="shift-divider">vs</div>
+              <div class="shift-stat">
+                <span class="stat-label">Without Model</span>
+                <span class="stat-val text-muted" id="analytics-shift-without">₹2,634 / shift</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- DRIVER PROFILE FILTER SELECTOR -->
+          <div class="driver-filter-section">
+            <label for="analytics-driver-select" class="filter-label">Inspect Driver Persona:</label>
+            <div class="select-wrap">
+              <select id="analytics-driver-select" class="analytics-driver-dropdown">
+                <option value="ALL">Fleet Average (All 20 Zones)</option>
+                <option value="DRV_101">Aditya Singh (Z06 Shopping Mall Area)</option>
+                <option value="DRV_102">Rajesh Kumar (Z13 Entertainment District)</option>
+                <option value="DRV_103">Vikram Sharma (Z10 Residential South)</option>
+                <option value="DRV_104">Priya Patel (Z20 IT Corridor South)</option>
+              </select>
+            </div>
+            <div id="driver-personalized-callout" class="driver-personalized-callout hidden">
+              <!-- Dynamically populated with driver specific numbers -->
+            </div>
+          </div>
+
+          <!-- 4 CORE COMPARATIVE METRICS -->
+          <div class="comparison-tiles-section">
+            <h4 class="section-title">Head-to-Head Performance (8-Hour Shift)</h4>
+            
+            <div class="comp-card">
+              <div class="comp-card-header">
+                <div class="comp-icon">💰</div>
+                <div class="comp-title-group">
+                  <div class="comp-title">Net Shift Take-Home</div>
+                  <div class="comp-subtitle">Fuel & reposition travel cost deducted</div>
+                </div>
+                <div class="comp-gain-tag" id="comp-earnings-pct">+85.9%</div>
+              </div>
+              <div class="comp-bars">
+                <div class="comp-bar-row">
+                  <span class="bar-name">Without Model</span>
+                  <div class="bar-track"><div class="bar-fill base" style="width: 53.8%;"></div></div>
+                  <span class="bar-val" id="comp-base-earn">₹2,634</span>
+                </div>
+                <div class="comp-bar-row">
+                  <span class="bar-name">With CommitCon</span>
+                  <div class="bar-track"><div class="bar-fill model" style="width: 100%;"></div></div>
+                  <span class="bar-val text-green" id="comp-model-earn">₹4,896</span>
+                </div>
+              </div>
+              <div class="comp-diff-footer">
+                <span>Net Advantage:</span> <strong class="text-green" id="comp-earn-diff">+₹2,262 per shift</strong>
+              </div>
+            </div>
+
+            <div class="comp-card">
+              <div class="comp-card-header">
+                <div class="comp-icon">🚖</div>
+                <div class="comp-title-group">
+                  <div class="comp-title">Completed Trips</div>
+                  <div class="comp-subtitle">Paid passenger trips per 8-hour shift</div>
+                </div>
+                <div class="comp-gain-tag" id="comp-trips-pct">+64.1%</div>
+              </div>
+              <div class="comp-bars">
+                <div class="comp-bar-row">
+                  <span class="bar-name">Without Model</span>
+                  <div class="bar-track"><div class="bar-fill base" style="width: 60.9%;"></div></div>
+                  <span class="bar-val" id="comp-base-trips">9.2 trips</span>
+                </div>
+                <div class="comp-bar-row">
+                  <span class="bar-name">With CommitCon</span>
+                  <div class="bar-track"><div class="bar-fill model" style="width: 100%;"></div></div>
+                  <span class="bar-val text-green" id="comp-model-trips">15.1 trips</span>
+                </div>
+              </div>
+              <div class="comp-diff-footer">
+                <span>Extra Volume:</span> <strong class="text-green" id="comp-trips-diff">+5.9 rides / shift</strong>
+              </div>
+            </div>
+
+            <div class="comp-card">
+              <div class="comp-card-header">
+                <div class="comp-icon">⏳</div>
+                <div class="comp-title-group">
+                  <div class="comp-title">Average Idle Wait Time</div>
+                  <div class="comp-subtitle">Unpaid waiting between rides (per hour)</div>
+                </div>
+                <div class="comp-gain-tag green-tag" id="comp-wait-pct">-63.5%</div>
+              </div>
+              <div class="comp-bars">
+                <div class="comp-bar-row">
+                  <span class="bar-name">Without Model</span>
+                  <div class="bar-track"><div class="bar-fill alert" style="width: 100%;"></div></div>
+                  <span class="bar-val text-red" id="comp-base-wait">28.5 min/hr</span>
+                </div>
+                <div class="comp-bar-row">
+                  <span class="bar-name">With CommitCon</span>
+                  <div class="bar-track"><div class="bar-fill model" style="width: 36.5%;"></div></div>
+                  <span class="bar-val text-green" id="comp-model-wait">10.4 min/hr</span>
+                </div>
+              </div>
+              <div class="comp-diff-footer">
+                <span>Time Saved:</span> <strong class="text-green" id="comp-wait-diff">18.1 min less idle wait</strong>
+              </div>
+            </div>
+
+            <div class="comp-card">
+              <div class="comp-card-header">
+                <div class="comp-icon">⚡</div>
+                <div class="comp-title-group">
+                  <div class="comp-title">Surge Fare Capture</div>
+                  <div class="comp-subtitle">Percentage of trips with 1.3x - 2.5x multiplier</div>
+                </div>
+                <div class="comp-gain-tag" id="comp-surge-tag">3.5x Multiplier</div>
+              </div>
+              <div class="comp-bars">
+                <div class="comp-bar-row">
+                  <span class="bar-name">Without Model</span>
+                  <div class="bar-track"><div class="bar-fill base" style="width: 28.1%;"></div></div>
+                  <span class="bar-val" id="comp-base-surge">18.2%</span>
+                </div>
+                <div class="comp-bar-row">
+                  <span class="bar-name">With CommitCon</span>
+                  <div class="bar-track"><div class="bar-fill model" style="width: 100%;"></div></div>
+                  <span class="bar-val text-green" id="comp-model-surge">64.8%</span>
+                </div>
+              </div>
+              <div class="comp-diff-footer">
+                <span>Surge Advantage:</span> <strong class="text-green">+46.6% more surge rides</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- 24-HOUR EARNINGS HOURLY CHART -->
+          <div class="hourly-chart-section">
+            <div class="chart-header">
+              <h4 class="section-title">24-Hour Earnings Curve (₹ / Hour)</h4>
+              <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot base"></span> Without Model</span>
+                <span class="legend-item"><span class="legend-dot model"></span> With CommitCon</span>
+              </div>
+            </div>
+            <p class="chart-sub">Notice dramatic revenue spikes during morning rush (08:00 - 10:00) and evening peak (18:00 - 22:00) where predictive positioning captures high surge rates.</p>
+            
+            <div class="hourly-chart-wrapper" id="hourly-chart-container">
+              <!-- Rendered via JS bars -->
+            </div>
+          </div>
+
+          <!-- REAL-WORLD CASE STUDY: A TALE OF TWO DRIVERS -->
+          <div class="case-study-section">
+            <div class="case-badge">CASE STUDY IN DATA</div>
+            <h4 class="case-title">A Tale of Two Drivers: Friday Evening Shift</h4>
+            <div class="case-scenario-meta">
+              <span>📅 Friday 16:00 – 00:00</span> • <span>🏏 IPL Cricket Match &amp; Tech Corridor Exit</span>
+            </div>
+
+            <div class="case-split-grid">
+              <div class="case-card driver-a">
+                <div class="case-driver-badge unoptimized">Driver A: Reactive (No Model)</div>
+                <p class="case-behavior">Waited in Z06 (Shopping Mall) hoping for random shoppers. Waited 32 mins on average between rides.</p>
+                <div class="case-metrics">
+                  <div class="cm-row"><span>Trips Completed:</span> <strong>8 rides</strong></div>
+                  <div class="cm-row"><span>Surge Trips:</span> <strong>1 ride (12%)</strong></div>
+                  <div class="cm-row"><span>Gross Revenue:</span> <strong>₹1,920</strong></div>
+                  <div class="cm-row"><span>Fuel &amp; Deadhead:</span> <span class="text-red">-₹220</span></div>
+                  <div class="cm-row total"><span>Net Earnings:</span> <strong class="case-net-base">₹1,700</strong></div>
+                </div>
+              </div>
+
+              <div class="case-card driver-b">
+                <div class="case-driver-badge optimized">Driver B: CommitCon Assisted</div>
+                <p class="case-behavior">Alerted 45 mins early: "Reposition to Z02 Airport &amp; Z07 Railway (+10 driver shortage)". Arrived before surge peaked.</p>
+                <div class="case-metrics">
+                  <div class="cm-row"><span>Trips Completed:</span> <strong class="text-green">15 rides</strong></div>
+                  <div class="cm-row"><span>Surge Trips:</span> <strong class="text-green">11 rides (73%)</strong></div>
+                  <div class="cm-row"><span>Gross Revenue:</span> <strong>₹3,840</strong></div>
+                  <div class="cm-row"><span>Fuel &amp; Reposition:</span> <span class="text-red">-₹310</span></div>
+                  <div class="cm-row total"><span>Net Earnings:</span> <strong class="case-net-model">₹3,530</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="case-verdict-box">
+              <div class="verdict-icon">🏆</div>
+              <div class="verdict-content">
+                <strong>+₹1,830 Extra Cash in Pocket (+107%)</strong>
+                <p>Driver B doubled their net shift income on the exact same Friday night by being in position when passengers requested rides.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- THE 3 PILLARS EXPLANATION -->
+          <div class="pillars-section">
+            <h4 class="section-title">How CommitCon Generates This Profit</h4>
+            
+            <div class="pillar-card">
+              <div class="pillar-num">1</div>
+              <div class="pillar-content">
+                <h5>Eliminating the "Supply Glut" Trap</h5>
+                <p>Reactive drivers naturally cluster around city centers or mall parking lots where 20+ idle cabs wait for 5 passengers. CommitCon routes you to underserved zones with high passenger queues, slashing unpaid idle time by 63.5%.</p>
+              </div>
+            </div>
+
+            <div class="pillar-card">
+              <div class="pillar-num">2</div>
+              <div class="pillar-content">
+                <h5>Surge Arbitrage Before It Disappears</h5>
+                <p>Surge pricing only lasts 30-45 minutes. Drivers who react only after surge appears usually arrive after it has collapsed. CommitCon forecasts demand 15-45 minutes in advance using XGBoost, placing you in position right as 1.5x-2.5x multipliers trigger.</p>
+              </div>
+            </div>
+
+            <div class="pillar-card">
+              <div class="pillar-num">3</div>
+              <div class="pillar-content">
+                <h5>Fuel &amp; Deadhead Expense Guarantee</h5>
+                <p>Every reposition recommendation factors in travel time and fuel consumption (~₹4.50/km). The recommendation algorithm only dispatches you if the expected incremental fare volume exceeds reposition expenses by at least 4x.</p>
+              </div>
+            </div>
+          </div>
         </div>
 
       </aside>

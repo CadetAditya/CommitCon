@@ -12,3 +12,4 @@ services:
       - key: AI_INFERENCE_KEY
         value: commitcon-secret-2026
     plan: free
+

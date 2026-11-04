@@ -24,6 +24,8 @@ const state = {
   routePolyline: null,
   routePulseMarker: null,
   chatHistory: [],
+  earningsAnalysis: null,
+  currentTab: 'personal',
 };
 
 // DOM Elements
@@ -50,13 +52,39 @@ const modelRefreshLabel = document.getElementById('model-refresh-label');
 const tabPersonalBtn = document.getElementById('tab-personal-btn');
 const tabOverallBtn = document.getElementById('tab-overall-btn');
 const tabCopilotBtn = document.getElementById('tab-copilot-btn');
+const tabAnalyticsBtn = document.getElementById('tab-analytics-btn');
 const headerCopilotBtn = document.getElementById('header-copilot-btn');
+const headerAnalyticsBtn = document.getElementById('header-analytics-btn');
 const panelPersonal = document.getElementById('panel-personal');
 const panelOverall = document.getElementById('panel-overall');
 const panelCopilot = document.getElementById('panel-copilot');
+const panelAnalytics = document.getElementById('panel-analytics');
 const personalBadgeCount = document.getElementById('personal-badge-count');
 const personalCardsList = document.getElementById('personal-cards-list');
 const refreshPersonalBtn = document.getElementById('refresh-personal-btn');
+
+// Analytics DOM Elements
+const analyticsMonthlyGain = document.getElementById('analytics-monthly-gain');
+const analyticsShiftWith = document.getElementById('analytics-shift-with');
+const analyticsShiftWithout = document.getElementById('analytics-shift-without');
+const analyticsDriverSelect = document.getElementById('analytics-driver-select');
+const driverPersonalizedCallout = document.getElementById('driver-personalized-callout');
+const compEarningsPct = document.getElementById('comp-earnings-pct');
+const compBaseEarn = document.getElementById('comp-base-earn');
+const compModelEarn = document.getElementById('comp-model-earn');
+const compEarnDiff = document.getElementById('comp-earn-diff');
+const compTripsPct = document.getElementById('comp-trips-pct');
+const compBaseTrips = document.getElementById('comp-base-trips');
+const compModelTrips = document.getElementById('comp-model-trips');
+const compTripsDiff = document.getElementById('comp-trips-diff');
+const compWaitPct = document.getElementById('comp-wait-pct');
+const compBaseWait = document.getElementById('comp-base-wait');
+const compModelWait = document.getElementById('comp-model-wait');
+const compWaitDiff = document.getElementById('comp-wait-diff');
+const compSurgeTag = document.getElementById('comp-surge-tag');
+const compBaseSurge = document.getElementById('comp-base-surge');
+const compModelSurge = document.getElementById('comp-model-surge');
+const hourlyChartContainer = document.getElementById('hourly-chart-container');
 
 // Copilot Chat Elements
 const copilotMessages = document.getElementById('copilot-messages');
@@ -122,11 +150,49 @@ function setupEventListeners() {
     });
   });
 
-  // Tab switching
-  tabPersonalBtn.addEventListener('click', () => switchTab('personal'));
-  tabOverallBtn.addEventListener('click', () => switchTab('overall'));
-  tabCopilotBtn.addEventListener('click', () => switchTab('copilot'));
-  headerCopilotBtn.addEventListener('click', () => switchTab('copilot'));
+  // Tab switching (Sidebar drawer: For Me & City only)
+  if (tabPersonalBtn) tabPersonalBtn.addEventListener('click', () => switchTab('personal'));
+  if (tabOverallBtn) tabOverallBtn.addEventListener('click', () => switchTab('overall'));
+  if (tabCopilotBtn) tabCopilotBtn.addEventListener('click', () => switchTab('copilot'));
+  if (tabAnalyticsBtn) tabAnalyticsBtn.addEventListener('click', () => switchTab('analytics'));
+
+  // Header Navbar Action Buttons (Sherpa & Impact on navbar only)
+  if (headerCopilotBtn) {
+    headerCopilotBtn.addEventListener('click', () => {
+      if (state.currentTab === 'copilot') {
+        switchTab('personal');
+      } else {
+        switchTab('copilot');
+      }
+    });
+  }
+
+  if (headerAnalyticsBtn) {
+    headerAnalyticsBtn.addEventListener('click', () => {
+      if (state.currentTab === 'analytics') {
+        switchTab('personal');
+      } else {
+        switchTab('analytics');
+      }
+    });
+  }
+
+  // Side Panel Close / Return buttons
+  const closeCopilotBtn = document.getElementById('close-copilot-btn');
+  if (closeCopilotBtn) {
+    closeCopilotBtn.addEventListener('click', () => switchTab('personal'));
+  }
+
+  const closeAnalyticsBtn = document.getElementById('close-analytics-btn');
+  if (closeAnalyticsBtn) {
+    closeAnalyticsBtn.addEventListener('click', () => switchTab('personal'));
+  }
+
+  if (analyticsDriverSelect) {
+    analyticsDriverSelect.addEventListener('change', (e) => {
+      handleDriverAnalyticsChange(e.target.value);
+    });
+  }
 
   // Copilot Chat listeners
   copilotForm.addEventListener('submit', (e) => {
@@ -570,22 +636,144 @@ function filterCityZones() {
 }
 
 function switchTab(tab) {
-  tabPersonalBtn.classList.toggle('active', tab === 'personal');
-  tabOverallBtn.classList.toggle('active', tab === 'overall');
-  tabCopilotBtn.classList.toggle('active', tab === 'copilot');
+  state.currentTab = tab;
 
-  panelPersonal.classList.toggle('hidden', tab !== 'personal');
-  panelOverall.classList.toggle('hidden', tab !== 'overall');
-  panelCopilot.classList.toggle('hidden', tab !== 'copilot');
+  // Sidebar Segmented Tabs (For Me & City)
+  if (tabPersonalBtn) tabPersonalBtn.classList.toggle('active', tab === 'personal');
+  if (tabOverallBtn) tabOverallBtn.classList.toggle('active', tab === 'overall');
+  if (tabCopilotBtn) tabCopilotBtn.classList.toggle('active', tab === 'copilot');
+  if (tabAnalyticsBtn) tabAnalyticsBtn.classList.toggle('active', tab === 'analytics');
+
+  // Header Navbar Action Buttons (Sherpa & Impact on navbar only)
+  if (headerCopilotBtn) headerCopilotBtn.classList.toggle('active', tab === 'copilot');
+  if (headerAnalyticsBtn) headerAnalyticsBtn.classList.toggle('active', tab === 'analytics');
+
+  // Sidebar Panels
+  if (panelPersonal) panelPersonal.classList.toggle('hidden', tab !== 'personal');
+  if (panelOverall) panelOverall.classList.toggle('hidden', tab !== 'overall');
+  if (panelCopilot) panelCopilot.classList.toggle('hidden', tab !== 'copilot');
+  if (panelAnalytics) panelAnalytics.classList.toggle('hidden', tab !== 'analytics');
 
   if (tab === 'copilot') {
     if (state.chatHistory.length === 0) {
       initCopilotWelcome();
     }
     setTimeout(() => {
-      copilotInput.focus();
+      if (copilotInput) copilotInput.focus();
       scrollChatToBottom();
     }, 100);
+  } else if (tab === 'analytics') {
+    if (!state.earningsAnalysis) {
+      loadEarningsAnalysis();
+    }
+  }
+}
+
+// ============================================================================
+// EARNINGS & COUNTERFACTUAL ROI ANALYSIS
+// ============================================================================
+async function loadEarningsAnalysis(driverId = null) {
+  try {
+    const url = driverId ? `/api/analysis/earnings?driver_id=${driverId}` : '/api/analysis/earnings';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to load earnings analysis');
+    const data = await res.json();
+    state.earningsAnalysis = data;
+
+    renderEarningsAnalysisUI(data);
+  } catch (err) {
+    console.error('Earnings analysis fetch failed:', err);
+  }
+}
+
+function renderEarningsAnalysisUI(data) {
+  if (!data || !data.summary) return;
+  const s = data.summary;
+
+  // Monthly hero
+  if (analyticsMonthlyGain) analyticsMonthlyGain.textContent = Number(s.monthly_net_gain).toLocaleString('en-IN');
+  if (analyticsShiftWith) analyticsShiftWith.textContent = `₹${Number(s.shift_model_earnings).toLocaleString('en-IN')} / shift`;
+  if (analyticsShiftWithout) analyticsShiftWithout.textContent = `₹${Number(s.shift_base_earnings).toLocaleString('en-IN')} / shift`;
+
+  // Comp tiles
+  if (compEarningsPct) compEarningsPct.textContent = `+${s.shift_pct_gain}%`;
+  if (compBaseEarn) compBaseEarn.textContent = `₹${Number(s.shift_base_earnings).toLocaleString('en-IN')}`;
+  if (compModelEarn) compModelEarn.textContent = `₹${Number(s.shift_model_earnings).toLocaleString('en-IN')}`;
+  if (compEarnDiff) compEarnDiff.textContent = `+₹${Number(s.shift_net_gain).toLocaleString('en-IN')} per shift`;
+
+  if (compTripsPct) compTripsPct.textContent = `+${Math.round(((s.model_trips_per_shift - s.base_trips_per_shift) / s.base_trips_per_shift) * 100)}%`;
+  if (compBaseTrips) compBaseTrips.textContent = `${s.base_trips_per_shift} trips`;
+  if (compModelTrips) compModelTrips.textContent = `${s.model_trips_per_shift} trips`;
+  if (compTripsDiff) compTripsDiff.textContent = `+${(s.model_trips_per_shift - s.base_trips_per_shift).toFixed(1)} rides / shift`;
+
+  if (compWaitPct) compWaitPct.textContent = `-${s.idle_reduction_pct}%`;
+  if (compBaseWait) compBaseWait.textContent = `${s.idle_wait_time_without} min/hr`;
+  if (compModelWait) compModelWait.textContent = `${s.idle_wait_time_with} min/hr`;
+  if (compWaitDiff) compWaitDiff.textContent = `${(s.idle_wait_time_without - s.idle_wait_time_with).toFixed(1)} min less idle wait`;
+
+  if (compBaseSurge) compBaseSurge.textContent = s.surge_capture_rate_without;
+  if (compModelSurge) compModelSurge.textContent = s.surge_capture_rate_with;
+
+  // 24-Hour hourly chart
+  if (data.hourly_chart && hourlyChartContainer) {
+    renderHourlyChart(data.hourly_chart);
+  }
+}
+
+function renderHourlyChart(hourlyData) {
+  if (!hourlyChartContainer || !hourlyData) return;
+  hourlyChartContainer.innerHTML = '';
+
+  const maxVal = Math.max(...hourlyData.map(h => Math.max(h.without_model, h.with_model))) || 700;
+
+  hourlyData.forEach(h => {
+    const col = document.createElement('div');
+    col.className = 'hourly-col';
+
+    const basePct = Math.max(8, Math.round((h.without_model / maxVal) * 100));
+    const modelPct = Math.max(12, Math.round((h.with_model / maxVal) * 100));
+
+    col.innerHTML = `
+      <div class="hourly-tooltip">
+        <strong>${h.label}</strong><br>
+        CommitCon: ₹${h.with_model}<br>
+        Without: ₹${h.without_model}<br>
+        Gain: +₹${h.difference} (+${h.pct_increase}%)
+      </div>
+      <div class="hourly-col-bars">
+        <div class="bar-sub bar-base" style="height: ${basePct}%;" title="Without Model: ₹${h.without_model}"></div>
+        <div class="bar-sub bar-model" style="height: ${modelPct}%;" title="With CommitCon: ₹${h.with_model}"></div>
+      </div>
+      <span class="hour-label">${h.hour % 3 === 0 ? h.label.split(':')[0] : ''}</span>
+    `;
+
+    hourlyChartContainer.appendChild(col);
+  });
+}
+
+function handleDriverAnalyticsChange(driverKey) {
+  if (!state.earningsAnalysis) return;
+  const profiles = state.earningsAnalysis.driver_profiles || {};
+
+  if (driverKey === 'ALL' || !profiles[driverKey]) {
+    if (driverPersonalizedCallout) {
+      driverPersonalizedCallout.classList.add('hidden');
+      driverPersonalizedCallout.innerHTML = '';
+    }
+    renderEarningsAnalysisUI(state.earningsAnalysis);
+    return;
+  }
+
+  const p = profiles[driverKey];
+  if (driverPersonalizedCallout) {
+    driverPersonalizedCallout.classList.remove('hidden');
+    driverPersonalizedCallout.innerHTML = `
+      <div><strong>👤 ${p.name}</strong> • Base: ${p.home_zone}</div>
+      <div class="callout-row">💰 Projected Shift: <strong>₹${p.shift_with_model.toLocaleString('en-IN')}</strong> (vs ₹${p.shift_without_model.toLocaleString('en-IN')} baseline)</div>
+      <div class="callout-row">🚀 Monthly Extra Cash: <strong class="text-green">+₹${p.monthly_gain.toLocaleString('en-IN')}</strong></div>
+      <div class="callout-row">⚡ Top Surge Target: <strong>${p.top_surge_zone}</strong> (${p.surge_captures} surge rate)</div>
+      <div class="callout-row">⏱️ Idle Time Reduction: <strong>${p.idle_reduction_mins}</strong></div>
+    `;
   }
 }
 
