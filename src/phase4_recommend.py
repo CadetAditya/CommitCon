@@ -24,7 +24,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "data" / "commitcon.db"
 MODEL_PATH = BASE_DIR / "models" / "demand_model.joblib"
 FEATURE_COLUMNS_PATH = BASE_DIR / "models" / "feature_columns.json"

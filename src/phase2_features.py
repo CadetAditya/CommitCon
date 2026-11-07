@@ -20,7 +20,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-DB_PATH: Path = Path(__file__).parent / "data" / "commitcon.db"
+DB_PATH: Path = Path(__file__).parent.parent / "data" / "commitcon.db"
 
 PEAK_HOURS: set[int] = {8, 9, 10, 11, 17, 18, 19, 20}
 NEIGHBOR_TRAVEL_THRESHOLD_MIN: float = 25.0

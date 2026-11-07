@@ -6,3 +6,13 @@ logs/*.log
 .vscode/
 .idea/
 .DS_Store
+
+# Environments
+.venv/
+venv/
+env/
+inference/.venv/
+
+# Large Model Weights (GGUF)
+*.gguf
+

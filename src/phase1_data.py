@@ -22,7 +22,7 @@ import sys
 # Constants
 # ---------------------------------------------------------------------------
 SEED = 42
-DB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 DB_PATH = os.path.join(DB_DIR, "commitcon.db")
 
 START_DATE = datetime.datetime(2026, 10, 5, 0, 0, 0)

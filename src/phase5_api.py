@@ -31,12 +31,20 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from earnings_analysis import compute_historical_earnings_analysis
-from phase4_recommend import (
-    generate_recommendations,
-    get_driver_personalized_recommendations,
-    DB_PATH,
-)
+try:
+    from .earnings_analysis import compute_historical_earnings_analysis
+    from .phase4_recommend import (
+        generate_recommendations,
+        get_driver_personalized_recommendations,
+        DB_PATH,
+    )
+except (ImportError, ValueError):
+    from earnings_analysis import compute_historical_earnings_analysis
+    from phase4_recommend import (
+        generate_recommendations,
+        get_driver_personalized_recommendations,
+        DB_PATH,
+    )
 
 # ---------------------------------------------------------------------------
 # Logging & Timezone
@@ -48,7 +56,7 @@ logging.basicConfig(
 logger = logging.getLogger("commitcon_api")
 IST = timezone(timedelta(hours=5, minutes=30))
 
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
 # AI Inference Service Configuration
@@ -639,5 +647,10 @@ def manual_refresh():
 
 
 if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    root = str(Path(__file__).resolve().parent.parent)
+    if root not in sys.path:
+        sys.path.insert(0, root)
     import uvicorn
-    uvicorn.run("phase5_api:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("src.phase5_api:app", host="0.0.0.0", port=8000, reload=True)

@@ -278,7 +278,7 @@ def generate_map():
         draw.text((legend_x + 52, iy), desc, fill="#334155", font=font_sm)
 
     # Save output to static directory
-    out_path = Path("static") / "traffic_map.png"
+    out_path = Path(__file__).parent.parent / "static" / "traffic_map.png"
     im.save(str(out_path), "PNG", optimize=True)
     print(f"Traffic map successfully generated at {out_path} ({WIDTH}x{HEIGHT})")
 

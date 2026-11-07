@@ -11,3 +11,8 @@ logs/
 .gitignore
 .pytest_cache
 
+# Large model files & separate inference service
+*.gguf
+inference/
+
+
