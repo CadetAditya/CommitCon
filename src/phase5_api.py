@@ -502,11 +502,14 @@ async def driver_copilot_chat(req: DriverChatRequest):
     }
 
     # 3. Call GPU inference API
+    hf_token = os.getenv("HF_TOKEN")
     headers = {
         "Content-Type": "application/json",
         "X-API-Key": AI_INFERENCE_KEY,
         "User-Agent": "CommitCon-Backend"
     }
+    if hf_token:
+        headers["Authorization"] = f"Bearer {hf_token}" 
 
     try:
         async with httpx.AsyncClient(timeout=45.0) as client:
