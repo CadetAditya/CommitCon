@@ -22,6 +22,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import os
+import re
 from typing import List, Optional, Literal, Any
 import httpx
 
@@ -501,60 +502,146 @@ async def driver_copilot_chat(req: DriverChatRequest):
         "history": [{"role": m.role, "content": m.content} for m in (req.history or [])]
     }
 
-    # 3. Call GPU inference API
+    # 3. Call AI inference API (Hugging Face Gradio Space or Direct REST API)
     hf_token = os.getenv("HF_TOKEN")
     headers = {
         "Content-Type": "application/json",
         "X-API-Key": AI_INFERENCE_KEY,
-        "User-Agent": "CommitCon-Backend"
+        "User-Agent": "CommitCon-Backend",
     }
     if hf_token:
-        headers["Authorization"] = f"Bearer {hf_token}" 
+        headers["Authorization"] = f"Bearer {hf_token}"
+
+    # Build context-rich prompt so the model has live driver location & recommendation data
+    top_recs = recommendation_data.get("recommendations", [])[:3]
+    rec_summary = ", ".join([
+        f"{r.get('zone_id')} {r.get('zone_name')} (gap: +{r.get('supply_gap')}, ETA: {r.get('travel_time_min')}m)"
+        for r in top_recs
+    ])
+    context_prefix = (
+        f"[Context: Driver in {zone_id}. High-demand zones: {rec_summary}]. "
+        if rec_summary
+        else f"[Context: Driver in {zone_id}]. "
+    )
+    augmented_prompt = f"{context_prefix}{req.driver_prompt}"
+
+    is_hf_space = "hf.space" in AI_INFERENCE_URL or "huggingface.co" in AI_INFERENCE_URL
 
     try:
         async with httpx.AsyncClient(timeout=45.0) as client:
-            resp = await client.post(AI_INFERENCE_URL, json=payload, headers=headers)
-            
-            # If Hugging Face Gradio Space returns 405, seamlessly bridge via Gradio's native SSE endpoint
-            if resp.status_code == 405 and ("hf.space" in AI_INFERENCE_URL or "huggingface.co" in AI_INFERENCE_URL):
-                base_url = AI_INFERENCE_URL.split("/chat")[0].rstrip("/")
-                call_url = f"{base_url}/gradio_api/call/chat"
+            if is_hf_space:
+                base_url = re.sub(r"/(chat|gradio_api/call/.*)?$", "", AI_INFERENCE_URL).rstrip("/")
+                endpoints = [
+                    f"{base_url}/gradio_api/call/gradio_chat",
+                    f"{base_url}/gradio_api/call/chat",
+                ]
                 hf_headers = {"Content-Type": "application/json"}
                 if hf_token:
                     hf_headers["Authorization"] = f"Bearer {hf_token}"
-                
-                # Step 1: Submit prompt to Gradio chat queue
-                call_resp = await client.post(call_url, json={"data": [req.driver_prompt, []]}, headers=hf_headers)
-                call_resp.raise_for_status()
+
+                call_resp = None
+                call_url = None
+                last_call_error = None
+
+                for ep in endpoints:
+                    try:
+                        resp = await client.post(
+                            ep,
+                            json={"data": [augmented_prompt, []]},
+                            headers=hf_headers,
+                            timeout=15.0,
+                        )
+                        if resp.status_code == 200:
+                            call_resp = resp
+                            call_url = ep
+                            break
+                        else:
+                            last_call_error = f"HTTP {resp.status_code}: {resp.text[:120]}"
+                    except Exception as e:
+                        last_call_error = str(e)
+                        continue
+
+                if not call_resp or not call_url:
+                    raise RuntimeError(f"Could not connect to Gradio queue: {last_call_error}")
+
                 event_id = call_resp.json().get("event_id")
-                
-                # Step 2: Retrieve completed message
-                stream_resp = await client.get(f"{call_url}/{event_id}", headers=hf_headers)
-                stream_resp.raise_for_status()
-                
+                if not event_id:
+                    raise RuntimeError("No event_id returned by Gradio queue.")
+
+                # Stream SSE response from Gradio
                 answer = ""
-                for line in stream_resp.text.splitlines():
-                    if line.startswith("data:"):
-                        try:
-                            parsed = json.loads(line[5:].strip())
-                            if isinstance(parsed, list) and len(parsed) > 0:
-                                last = parsed[-1]
-                                if isinstance(last, list) and len(last) > 1:
-                                    answer = str(last[1])
-                                elif isinstance(last, str):
-                                    answer = str(last)
-                        except Exception:
-                            pass
-                
+                quota_error = None
+                async with client.stream("GET", f"{call_url}/{event_id}", headers=hf_headers, timeout=40.0) as stream:
+                    if stream.status_code != 200:
+                        stream.raise_for_status()
+                    async for line in stream.aiter_lines():
+                        if not line:
+                            continue
+                        if line.startswith("event: error"):
+                            continue
+                        if line.startswith("data:"):
+                            raw_data = line[5:].strip()
+                            try:
+                                parsed = json.loads(raw_data)
+                                if isinstance(parsed, dict) and "error" in parsed:
+                                    quota_error = parsed["error"]
+                                elif isinstance(parsed, list) and len(parsed) > 0:
+                                    last = parsed[-1]
+                                    if isinstance(last, list) and len(last) > 1:
+                                        answer = str(last[1])
+                                    elif isinstance(last, str):
+                                        answer = str(last)
+                            except Exception:
+                                pass
+                        elif "event: complete" in line:
+                            break
+
+                if quota_error:
+                    raise RuntimeError(quota_error)
+
                 if not answer:
-                    answer = "Response received from model."
-                    
+                    answer = "Response received from Hugging Face model."
+
                 return DriverChatResponse(
                     status="success",
                     driver_id=req.driver_id,
                     answer=answer,
-                    model="project-driver-qwen-gguf"
+                    model="huggingface-qwen-0.8b",
                 )
+
+            # Direct REST API POST (e.g. local Ollama / Docker / FastAPI)
+            resp = await client.post(AI_INFERENCE_URL, json=payload, headers=headers)
+
+            # If a non-HF URL returns 405, fall back to checking if it's a Gradio space
+            if resp.status_code == 405:
+                base_url = re.sub(r"/(chat|gradio_api/call/.*)?$", "", AI_INFERENCE_URL).rstrip("/")
+                call_resp = await client.post(
+                    f"{base_url}/gradio_api/call/gradio_chat",
+                    json={"data": [augmented_prompt, []]},
+                    headers=headers,
+                    timeout=15.0,
+                )
+                if call_resp.status_code == 200:
+                    event_id = call_resp.json().get("event_id")
+                    async with client.stream("GET", f"{base_url}/gradio_api/call/gradio_chat/{event_id}", headers=headers, timeout=40.0) as stream:
+                        answer = ""
+                        async for line in stream.aiter_lines():
+                            if line.startswith("data:"):
+                                try:
+                                    parsed = json.loads(line[5:].strip())
+                                    if isinstance(parsed, list) and len(parsed) > 0:
+                                        last = parsed[-1]
+                                        answer = str(last[1] if isinstance(last, list) and len(last) > 1 else last)
+                                except Exception:
+                                    pass
+                            elif "event: complete" in line:
+                                break
+                    return DriverChatResponse(
+                        status="success",
+                        driver_id=req.driver_id,
+                        answer=answer or "Response received.",
+                        model="huggingface-qwen-0.8b",
+                    )
 
             resp.raise_for_status()
             data = resp.json()
@@ -562,8 +649,9 @@ async def driver_copilot_chat(req: DriverChatRequest):
                 status="success",
                 driver_id=req.driver_id,
                 answer=data.get("answer", "No answer received from model."),
-                model=data.get("model", "project-driver:latest")
+                model=data.get("model", "project-driver:latest"),
             )
+
     except httpx.TimeoutException:
         logger.error("AI inference service timed out for driver %s", req.driver_id)
         top_rec = recommendation_data["recommendations"][0] if recommendation_data.get("recommendations") else None
@@ -577,22 +665,28 @@ async def driver_copilot_chat(req: DriverChatRequest):
             status="fallback",
             driver_id=req.driver_id,
             answer=fallback_msg,
-            model="local-rules-engine"
+            model="local-rules-engine",
         )
     except Exception as exc:
         logger.exception("AI inference error: %s", exc)
         top_rec = recommendation_data["recommendations"][0] if recommendation_data.get("recommendations") else None
+        err_str = str(exc)
+        if "quota" in err_str.lower():
+            err_reason = "Hugging Face ZeroGPU daily quota reached. To increase quota, set HF_TOKEN in Render environment."
+        else:
+            err_reason = err_str[:80]
+
         fallback_msg = (
-            f"Note: External GPU inference reached limit ({str(exc)[:60]}). "
+            f"Note: External GPU inference reached limit ({err_reason}). "
             f"Live recommendation: Reposition to {top_rec['zone_id']} {top_rec['zone_name']} "
             f"(ETA: {top_rec['travel_time_min']} mins, +{top_rec['supply_gap']} drivers needed)."
-            if top_rec else f"AI service error: {exc}"
+            if top_rec else f"AI service note: {err_reason}"
         )
         return DriverChatResponse(
             status="fallback",
             driver_id=req.driver_id,
             answer=fallback_msg,
-            model="local-rules-engine"
+            model="local-rules-engine",
         )
 
 
