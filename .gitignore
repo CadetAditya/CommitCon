@@ -16,3 +16,7 @@ inference/.venv/
 # Large Model Weights (GGUF)
 *.gguf
 
+
+# Secrets and environment configs
+.env
+*.env
