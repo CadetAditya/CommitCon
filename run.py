@@ -18,5 +18,5 @@ if __name__ == "__main__":
     print(f"Starting CommitCon Driver Portal on {host}:{port} ...")
     
     import uvicorn
-    uvicorn.run("phase5_api:app", host=host, port=port, log_level="info")
+    uvicorn.run("src.phase5_api:app", host=host, port=port, log_level="info")
 

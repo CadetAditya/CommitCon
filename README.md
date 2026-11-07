@@ -54,9 +54,11 @@ An end-to-end Machine Learning and FastAPI recommendation engine with a complete
 - One-click **"Accept Reposition & Navigate"** activating live in-app navigation simulation.
 
 ### 4. Sherpa AI Copilot (GPU Driver Chatbot)
-- Fine-tuned inference assistant powered by `project-driver:latest`.
+- Fine-tuned inference assistant powered by `project-driver:latest` (Qwen3.5-0.8B Q4_K_M).
+- Standalone inference server and Ollama Modelfile located in [`inference/`](./inference).
 - Provides contextual reasoning on demand forecasts, traffic bottlenecks, and earnings opportunities.
 - Accessible via the **🧭 Sherpa** tab and top header pill.
+- Supports remote GPU inference (via `AI_INFERENCE_URL`) or local Ollama execution with fallback to heuristics rules engine.
 
 ---
 
@@ -84,11 +86,11 @@ This repository includes a production-ready `render.yaml` Blueprint and `Dockerf
 
 ### 1. Start the Full Service (Backend API + Frontend Web App)
 ```bash
-python phase5_api.py
+python run.py
 ```
 Or via Uvicorn:
 ```bash
-uvicorn phase5_api:app --host 0.0.0.0 --port 8000 --reload
+uvicorn src.phase5_api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 * **Driver Portal (Web App)**: Open [http://localhost:8000](http://localhost:8000) in your browser.
@@ -97,6 +99,17 @@ uvicorn phase5_api:app --host 0.0.0.0 --port 8000 --reload
 ### 2. Run Complete Verification Test Suite
 ```bash
 python test_system.py
+```
+*(Or `python -m src.test_system`)*
+
+### 3. (Optional) Run Local AI Inference Service
+```bash
+# Setup model in Ollama:
+cd inference/ollama && ollama create project-driver:latest -f Modelfile
+
+# Start inference API on port 8001:
+set API_KEY=commitcon-secret-2026
+python -m uvicorn inference.main:app --port 8001
 ```
 
 ---
