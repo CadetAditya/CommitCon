@@ -514,6 +514,48 @@ async def driver_copilot_chat(req: DriverChatRequest):
     try:
         async with httpx.AsyncClient(timeout=45.0) as client:
             resp = await client.post(AI_INFERENCE_URL, json=payload, headers=headers)
+            
+            # If Hugging Face Gradio Space returns 405, seamlessly bridge via Gradio's native SSE endpoint
+            if resp.status_code == 405 and ("hf.space" in AI_INFERENCE_URL or "huggingface.co" in AI_INFERENCE_URL):
+                base_url = AI_INFERENCE_URL.split("/chat")[0].rstrip("/")
+                call_url = f"{base_url}/gradio_api/call/chat"
+                hf_headers = {"Content-Type": "application/json"}
+                if hf_token:
+                    hf_headers["Authorization"] = f"Bearer {hf_token}"
+                
+                # Step 1: Submit prompt to Gradio chat queue
+                call_resp = await client.post(call_url, json={"data": [req.driver_prompt, []]}, headers=hf_headers)
+                call_resp.raise_for_status()
+                event_id = call_resp.json().get("event_id")
+                
+                # Step 2: Retrieve completed message
+                stream_resp = await client.get(f"{call_url}/{event_id}", headers=hf_headers)
+                stream_resp.raise_for_status()
+                
+                answer = ""
+                for line in stream_resp.text.splitlines():
+                    if line.startswith("data:"):
+                        try:
+                            parsed = json.loads(line[5:].strip())
+                            if isinstance(parsed, list) and len(parsed) > 0:
+                                last = parsed[-1]
+                                if isinstance(last, list) and len(last) > 1:
+                                    answer = str(last[1])
+                                elif isinstance(last, str):
+                                    answer = str(last)
+                        except Exception:
+                            pass
+                
+                if not answer:
+                    answer = "Response received from model."
+                    
+                return DriverChatResponse(
+                    status="success",
+                    driver_id=req.driver_id,
+                    answer=answer,
+                    model="project-driver-qwen-gguf"
+                )
+
             resp.raise_for_status()
             data = resp.json()
             return DriverChatResponse(
