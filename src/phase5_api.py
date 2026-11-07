@@ -60,7 +60,7 @@ BASE_DIR = Path(__file__).parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
 # AI Inference Service Configuration
-AI_INFERENCE_URL = os.getenv("AI_INFERENCE_URL", "https://win-s6b0cl04s86.tailf0b46c.ts.net/chat")
+AI_INFERENCE_URL = os.getenv("AI_INFERENCE_URL", "https://mohd-shujath-commitcon-driver-inference.hf.space/chat")
 AI_INFERENCE_KEY = os.getenv("AI_INFERENCE_KEY", "commitcon-secret-2026")
 
 # ---------------------------------------------------------------------------

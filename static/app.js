@@ -826,7 +826,7 @@ Ask me anything, like:
   appendCopilotMessage('assistant', welcomeText, false);
 }
 
-function appendCopilotMessage(role, text, save = true) {
+function appendCopilotMessage(role, text, save = true, meta = null) {
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   if (save) {
@@ -850,6 +850,7 @@ function appendCopilotMessage(role, text, save = true) {
         ${formattedHtml}
         <div class="chat-bubble-footer">
           <span class="chat-time">${timeStr}</span>
+          ${meta && meta.badge ? `<span class="hf-badge" style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:600;display:inline-flex;align-items:center;gap:3px;">🤗 ${meta.badge}</span>` : ''}
           <button type="button" class="msg-speak-btn" title="Listen to this message">
             <span class="speak-icon">🔊</span>
             <span>Listen</span>
@@ -935,7 +936,8 @@ async function sendCopilotMessage(prompt) {
 
     const data = await res.json();
     typingDiv.remove();
-    appendCopilotMessage('assistant', data.answer, true);
+    const sourceBadge = (data.status === 'success' || (data.model && data.model !== 'local-rules-engine')) ? 'Hugging Face (Qwen 0.8B)' : 'Local Heuristics';
+    appendCopilotMessage('assistant', data.answer, true, { badge: sourceBadge });
 
     // Text-to-Speech: Auto voice response if enabled
     if (state.ttsEnabled) {
